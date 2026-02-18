@@ -1,3 +1,10 @@
+"""Core node structure for representing Abstract and Concrete Syntax Trees.
+
+This module defines the fundamental Node class used throughout the project
+to represent hierarchical code structures.
+"""
+
+
 class Node:
     """Represents a node in an Abstract Syntax Tree (AST) or Concrete Syntax Tree (CST).
     
