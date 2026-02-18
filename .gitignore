@@ -1,16 +1,68 @@
-# Ignore JetBrains IDE settings
+# Python environment and packages
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+PIPFILE.lock
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+
+# IDE settings
 .idea/
-
-# Ignore VSCode settings
 .vscode/
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+.settings/
+*.sublime-project
+*.sublime-workspace
 
-# Ignore node_modules folder (for JS projects)
-node_modules/
-
-# Ignore environment variable files
-.env
-
-# Ignore system files
+# OS-specific files
 .DS_Store
 Thumbs.db
- 
+.Spotlight-V100
+.Trashes
+
+# Node.js (if used)
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE-specific directories
+.vscode/settings.json
+.vscode/extensions.json
