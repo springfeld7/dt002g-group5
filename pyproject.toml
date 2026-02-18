@@ -1,0 +1,20 @@
+[project]
+name = "transtructiver"
+version = "0.1.0"
+description = "This project delivers TranStructIVer: a modular and extensible software framework for automated semantics-preserving code transformation and verification."
+readme = "README.md"
+authors = [
+    { name = "Loviza Sahlén", email = "losa2300@student.miun.se" },
+    { name = "Thomas Springfeldt", email = "thsp1900@student.miun.se" }
+]
+requires-python = ">=3.14"
+dependencies = [
+    "pandas>=3.0.1",
+]
+
+[project.scripts]
+transtructiver = "transtructiver:main"
+
+[build-system]
+requires = ["uv_build>=0.10.4,<0.11.0"]
+build-backend = "uv_build"
