@@ -10,10 +10,15 @@ authors = [
 requires-python = ">=3.14"
 dependencies = [
     "pandas>=3.0.1",
+    "tree-sitter>=0.25.2",
+    "tree-sitter-language-pack>=0.13.0",
+    "tree-sitter-python>=0.25.0",
 ]
 
 [project.scripts]
 transtructiver = "transtructiver:main"
+proto-mutate = "transtructiver.prototype.mutation.mutate:main"
+proto-parse = "transtructiver.prototype.parsing.parse:main"
 
 [build-system]
 requires = ["uv_build>=0.10.4,<0.11.0"]
