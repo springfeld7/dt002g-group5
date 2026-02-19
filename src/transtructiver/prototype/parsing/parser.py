@@ -32,7 +32,7 @@ class Parser:
             Node: The root of the parsed CST.
         """
         try:
-            ts_language = get_language(cast(SupportedLanguage, language))
+            ts_language = get_language(cast(SupportedLanguage, language.lower()))
         except KeyError:
             raise ValueError(f"Unsupported language: {language}")
 
