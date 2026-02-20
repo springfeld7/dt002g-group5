@@ -20,6 +20,7 @@ dependencies = [
 transtructiver = "transtructiver:main"
 proto-mutate = "transtructiver.prototype.mutation.mutate:main"
 proto-parse = "transtructiver.prototype.parsing.parse:main"
+proto-verify = "transtructiver.prototype.verification.verify:main"
 proto-cli = "transtructiver.prototype.cli:main"
 
 [build-system]
