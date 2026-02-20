@@ -3,8 +3,9 @@ Structural Isomorphism Verifier (SIV) Module.
 
 This module provides the SIVerifier class, which audits code mutations 
 by comparing the Concrete Syntax Tree (CST) of original and mutated code 
-against a structural manifest. It calculates verification scores (1.0 for 
-perfect matches, fractional for partial) to ensure transformation integrity.
+against a structural manifest. It performs a strict coordinate-based 
+validation, returning a binary result (1.0 for a successful match, 
+0.0 for any structural or content mismatch).
 """
 
 import csv
