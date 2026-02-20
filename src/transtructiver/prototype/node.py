@@ -51,6 +51,19 @@ class Node:
         for child in self.children:
             yield from child.traverse()
 
+    def clone(self):
+        """
+        Creates a deep copy of the current node and all its children.
+    
+        Returns:
+            Node: A new instance of Node with identical type, text, and 
+                recursively cloned children.
+        """
+        new_node = Node(self.type, text=self.text)
+        new_node.children = [child.clone() for child in self.children]
+
+        return new_node
+
     def __repr__(self):
         """Return a string representation of the node.
         
