@@ -22,6 +22,20 @@ proto-mutate = "transtructiver.prototype.mutation.mutate:main"
 proto-parse = "transtructiver.prototype.parsing.parse:main"
 proto-cli = "transtructiver.prototype.cli:main"
 
+[tool.black]
+line-length = 100
+include = '\.pyi?$'
+exclude = '''
+/(
+    \.git
+  | \.venv
+  | venv
+  | build
+  | dist
+  | migrations
+)/
+'''
+
 [build-system]
 requires = ["uv_build>=0.10.4,<0.11.0"]
 build-backend = "uv_build"
