@@ -57,9 +57,9 @@ def run_pipeline(filepath: str, rules: list[str]):
     verifier = SIVerifier()
 
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    manifest_path = os.path.join(base_dir, 'manifest.json')
+    manifest_path = os.path.join(base_dir, "manifest.json")
     try:
-        with open(manifest_path, 'r') as f:
+        with open(manifest_path, "r") as f:
             manifest = json.load(f)
         print(f"Loaded manifest from: {manifest_path}")
     except FileNotFoundError:
@@ -67,8 +67,8 @@ def run_pipeline(filepath: str, rules: list[str]):
         return
 
     for idx, row in df.iterrows():
-        code = row['code']
-        language = row['language']
+        code = row["code"]
+        language = row["language"]
         snippet_id = f"row_{idx}"
         snippet_manifest = manifest.get(snippet_id, {})
 
@@ -81,7 +81,6 @@ def run_pipeline(filepath: str, rules: list[str]):
         print("\nMutated code:")
         mut_cst.pretty()
 
-        
         verified = verifier.verify(orig_cst, mut_cst, snippet_manifest)
         verifier.write_summary(snippet_id, verified)
 

@@ -21,7 +21,6 @@ class SIVerifier:
         self.ignored_paths = []
         self.success_count = 0
 
-
     def verify(self, orig_node, mut_node, snippet_manifest) -> bool:
         """
         Public entry point for the verification process.
@@ -35,7 +34,6 @@ class SIVerifier:
         self._verify_recursive(orig_node, mut_node, "0")
 
         return len(self.errors) == 0
-
 
     def _verify_recursive(self, orig, mut, path) -> bool:
         """Private recursive worker that walks the tree structure."""
@@ -53,7 +51,6 @@ class SIVerifier:
 
         return len(self.errors) == 0
 
-
     def _verify_node_integrity(self, orig, mut, path) -> bool:
         """Checks if types match and validates renamed identifiers."""
         if orig.type != mut.type:
@@ -63,19 +60,20 @@ class SIVerifier:
         if path in self.renamed_paths:
             expected_text = self.renamed_paths[path]
             if mut.text != expected_text:
-                self.errors.append(f"MUTATION_FAIL at {path}: Expected {expected_text}, got {mut.text}")
+                self.errors.append(
+                    f"MUTATION_FAIL at {path}: Expected {expected_text}, got {mut.text}"
+                )
         else:
             if orig.text != mut.text:
                 self.errors.append(f"UNEXPECTED_CHANGE at {path}: {orig.text} -> {mut.text}")
-        
-        return len(self.errors) == 0
 
+        return len(self.errors) == 0
 
     def write_summary(self, snippet_id, verified):
         """Appends the verification result to a headerless CSV."""
         score = 1.0 if verified else 0.0
         reason = "N/A" if verified else (self.errors[0] if self.errors else "Mismatch")
 
-        with open('summary_log.csv', 'a', newline='') as f:
+        with open("summary_log.csv", "a", newline="") as f:
             writer = csv.writer(f)
             writer.writerow([snippet_id, score, reason])
