@@ -7,6 +7,7 @@ and provides simple methods to inspect or print the loaded data.
 import pandas as pd
 import os
 
+
 class DataLoader:
     """Engine for loading and managing code snippets from a Parquet file.
 
@@ -68,8 +69,11 @@ class DataLoader:
         Returns:
             str: A human-readable representation of the DataLoader instance.
         """
-        return (f"DataLoader(file_path='{self.file_path}', "
-            f"rows_loaded={len(self.df) if self.df is not None else 0})")
+        return (
+            f"DataLoader(file_path='{self.file_path}', "
+            f"rows_loaded={len(self.df) if self.df is not None else 0})"
+        )
+
 
 if __name__ == "__main__":
     """

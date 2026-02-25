@@ -9,19 +9,28 @@ The sample CST represents the following pseudocode:
 
 from ..node import Node
 
-cst = Node("function_definition", [
-    Node("identifier", text="add"),
-    Node("parameters", [
-        Node("identifier", text="a"),
-        Node("identifier", text="b")
-    ]),
-    Node("body", [
-        Node("return_statement", [
-            Node("binary_expression", [
-                Node("identifier", text="a"),
-                Node("operator", text="+"),
-                Node("identifier", text="b")
-            ])
-        ])
-    ])
-])
+cst = Node(
+    "function_definition",
+    [
+        Node("identifier", text="add"),
+        Node("parameters", [Node("identifier", text="a"), Node("identifier", text="b")]),
+        Node(
+            "body",
+            [
+                Node(
+                    "return_statement",
+                    [
+                        Node(
+                            "binary_expression",
+                            [
+                                Node("identifier", text="a"),
+                                Node("operator", text="+"),
+                                Node("identifier", text="b"),
+                            ],
+                        )
+                    ],
+                )
+            ],
+        ),
+    ],
+)

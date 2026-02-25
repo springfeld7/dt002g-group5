@@ -14,14 +14,14 @@ from .mutation_engine import MutationEngine
 
 def main():
     """Main function that demonstrates CST mutation.
-    
+
     This function:
     1. Loads a mock CST (a simple function definition)
     2. Prints the original tree structure
     3. Creates a MutationEngine with RenameIdentifiersRule
     4. Applies the mutation rules to transform the tree
     5. Prints the mutated tree structure
-    
+
     The mutation rule prefixes all identifiers with "x_", so:
     - 'add' becomes 'x_add'
     - 'a' becomes 'x_a'
@@ -36,5 +36,6 @@ def main():
     print("\nAfter mutation:")
     mutated.pretty()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()
