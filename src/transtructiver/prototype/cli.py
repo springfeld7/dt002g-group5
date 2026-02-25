@@ -5,12 +5,13 @@ pipeline on datasets, including data loading, parsing, mutation, and verificatio
 """
 
 import argparse
+import json
+import os
 from .data_load.data_loader import DataLoader
 from .parsing.parser import Parser
 from .mutation.mutation_engine import MutationEngine
 from .mutation.mutation_rule import RenameIdentifiersRule
-
-# from '.verification.verifier' import 'verifier'
+from .verification.verifier import SIVerifier
 
 
 RULE_REGISTRY = {"rename-identifier": RenameIdentifiersRule}
@@ -53,22 +54,38 @@ def run_pipeline(filepath: str, rules: list[str]):
 
     engine = MutationEngine([RULE_REGISTRY[name]() for name in rules])
 
+    verifier = SIVerifier()
+
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    manifest_path = os.path.join(base_dir, 'manifest.json')
+    try:
+        with open(manifest_path, 'r') as f:
+            manifest = json.load(f)
+        print(f"Loaded manifest from: {manifest_path}")
+    except FileNotFoundError:
+        print(f"Error: Manifest NOT found at {manifest_path}")
+        return
+
     for idx, row in df.iterrows():
-        code = row["code"]
-        language = row["language"]
+        code = row['code']
+        language = row['language']
+        snippet_id = f"row_{idx}"
+        snippet_manifest = manifest.get(snippet_id, {})
 
-        print("Parsing...")
-        cst = parser.parse(code, language)
+        print(f"\n[{snippet_id}] Parsing...")
+        orig_cst = parser.parse(code, language)
         print("Original tree:")
-        cst.pretty()
+        orig_cst.pretty()
 
+        mut_cst = engine.applyMutations(orig_cst.clone())
         print("\nMutated code:")
-        engine.applyMutations(cst).pretty()
+        mut_cst.pretty()
 
-        # 4. Verify
-        # verified = verify(cst, mutated)
+        
+        verified = verifier.verify(orig_cst, mut_cst, snippet_manifest)
+        verifier.write_summary(snippet_id, verified)
 
-        print(f"\nRow {idx}: OK")
+        print(f'\nRow {idx}: {"PASS" if verified else "FAIL"}')
 
 
 def main():
