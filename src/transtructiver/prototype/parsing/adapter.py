@@ -22,15 +22,12 @@ def convert_node(ts_node, source_bytes):
         Node: The root of the converted Node subtree.
     """
     if ts_node.child_count == 0:
-        text = source_bytes[ts_node.start_byte:ts_node.end_byte].decode("utf8")
+        text = source_bytes[ts_node.start_byte : ts_node.end_byte].decode("utf8")
     else:
         text = None
 
     return Node(
         type=ts_node.type,
         text=text,
-        children=[
-            convert_node(child, source_bytes)
-            for child in ts_node.children
-        ]
+        children=[convert_node(child, source_bytes) for child in ts_node.children],
     )

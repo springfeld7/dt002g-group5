@@ -16,19 +16,28 @@ The mutations applied in this mock CST include:
 
 from ..node import Node
 
-cst = Node("function_definition", [
-    Node("identifier", text="x_add"),
-    Node("parameters", [
-        Node("identifier", text="x_a"),
-        Node("identifier", text="x_b")
-    ]),
-    Node("body", [
-        Node("return_statement", [
-            Node("binary_expression", [
-                Node("identifier", text="x_a"),
-                Node("operator", text="+"),
-                Node("identifier", text="x_b")
-            ])
-        ])
-    ])
-])
+cst = Node(
+    "function_definition",
+    [
+        Node("identifier", text="x_add"),
+        Node("parameters", [Node("identifier", text="x_a"), Node("identifier", text="x_b")]),
+        Node(
+            "body",
+            [
+                Node(
+                    "return_statement",
+                    [
+                        Node(
+                            "binary_expression",
+                            [
+                                Node("identifier", text="x_a"),
+                                Node("operator", text="+"),
+                                Node("identifier", text="x_b"),
+                            ],
+                        )
+                    ],
+                )
+            ],
+        ),
+    ],
+)

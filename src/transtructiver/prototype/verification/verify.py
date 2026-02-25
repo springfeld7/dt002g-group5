@@ -19,19 +19,19 @@ from src.transtructiver.prototype.verification.verifier import SIVerifier
 
 mock_manifest = {
     "renamed_paths": {
-        "0.0": "x_add",         # function_definition -> identifier (add)
-        "0.1.0": "x_a",         # function_definition -> parameters -> identifier (a)
-        "0.1.1": "x_b",         # function_definition -> parameters -> identifier (b)
-        "0.2.0.0.0": "x_a",     # body -> return_stmt -> bin_expr -> identifier (a)
-        "0.2.0.0.2": "x_b"      # body -> return_stmt -> bin_expr -> identifier (b)
+        "0.0": "x_add",  # function_definition -> identifier (add)
+        "0.1.0": "x_a",  # function_definition -> parameters -> identifier (a)
+        "0.1.1": "x_b",  # function_definition -> parameters -> identifier (b)
+        "0.2.0.0.0": "x_a",  # body -> return_stmt -> bin_expr -> identifier (a)
+        "0.2.0.0.2": "x_b",  # body -> return_stmt -> bin_expr -> identifier (b)
     },
-    "ignored_paths": []
+    "ignored_paths": [],
 }
 
 
 def main():
     """
-    Executes a Parallel Recursive Walk to verify structural isomorphism 
+    Executes a Parallel Recursive Walk to verify structural isomorphism
     specifically for identifier renaming mutations.
     """
     verifier = SIVerifier()
@@ -45,7 +45,7 @@ def main():
 
     print(f"\n[SUMMARY]")
     print(f"Status: {status}")
-    
+
     if not is_valid:
         print("Detailed Errors:")
         for error in verifier.errors:

@@ -14,29 +14,27 @@ from .mutation.mutation_rule import RenameIdentifiersRule
 from .verification.verifier import SIVerifier
 
 
-RULE_REGISTRY = {
-    'rename-identifier': RenameIdentifiersRule
-}
+RULE_REGISTRY = {"rename-identifier": RenameIdentifiersRule}
 
 
 def run_pipeline(filepath: str, rules: list[str]):
     """Run the complete TranStructIVer pipeline on a dataset file.
-    
+
     This function orchestrates the full transformation pipeline:
     1. Load code samples from a dataset file
     2. Parse each code sample into a CST
     3. Apply mutation rules to transform the CST
     4. Display the mutated code
-    
+
     Args:
         filepath (str): Path to the dataset file (Parquet format) containing code samples.
             Expected columns: 'code' (source code) and 'language' (programming language).
         rules (list[str]): List of mutation rule names to apply. Available rules are
             defined in RULE_REGISTRY. Example: ['rename-identifier', 'other-rule'].
-    
+
     Raises:
         ValueError: If any of the specified rules are not found in RULE_REGISTRY.
-    
+
     Example:
         >>> run_pipeline('dataset.parquet', ['rename-identifier'])
     """
@@ -52,16 +50,16 @@ def run_pipeline(filepath: str, rules: list[str]):
             unsupported_rules.append(rule)
 
     if len(unsupported_rules) > 0:
-        raise ValueError(f'Arguments contain unsupported mutation rule: {unsupported_rules}')
+        raise ValueError(f"Arguments contain unsupported mutation rule: {unsupported_rules}")
 
     engine = MutationEngine([RULE_REGISTRY[name]() for name in rules])
 
     verifier = SIVerifier()
 
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    manifest_path = os.path.join(base_dir, 'manifest.json')
+    manifest_path = os.path.join(base_dir, "manifest.json")
     try:
-        with open(manifest_path, 'r') as f:
+        with open(manifest_path, "r") as f:
             manifest = json.load(f)
         print(f"Loaded manifest from: {manifest_path}")
     except FileNotFoundError:
@@ -69,8 +67,8 @@ def run_pipeline(filepath: str, rules: list[str]):
         return
 
     for idx, row in df.iterrows():
-        code = row['code']
-        language = row['language']
+        code = row["code"]
+        language = row["language"]
         snippet_id = f"row_{idx}"
         snippet_manifest = manifest.get(snippet_id, {})
 
@@ -83,7 +81,6 @@ def run_pipeline(filepath: str, rules: list[str]):
         print("\nMutated code:")
         mut_cst.pretty()
 
-        
         verified = verifier.verify(orig_cst, mut_cst, snippet_manifest)
         verifier.write_summary(snippet_id, verified)
 
@@ -92,27 +89,26 @@ def run_pipeline(filepath: str, rules: list[str]):
 
 def main():
     """Main entry point for the TranStructIVer CLI.
-    
+
     Parses command-line arguments and executes the transformation pipeline.
-    
+
     Command-line Arguments:
         filepath: Path to the dataset file (Parquet format) to process.
         rules: Optional list of mutation rules to apply. Defaults to ['rename-identifier'].
-    
+
     Example:
         python -m prototype.cli dataset.parquet rename-identifier
         development: uv run proto-cli src\\transtructiver\\prototype\\data_load\\sample.parquet
     """
     argparser = argparse.ArgumentParser(
-        prog='TranStructIVer',
-        description='Run the TranStructIVer pipeline on a dataset file.'
+        prog="TranStructIVer", description="Run the TranStructIVer pipeline on a dataset file."
     )
-    argparser.add_argument('filepath', help='Path to the dataset file')
-    argparser.add_argument('rules', nargs='*', help='Mutation rules', default=['rename-identifier'])
+    argparser.add_argument("filepath", help="Path to the dataset file")
+    argparser.add_argument("rules", nargs="*", help="Mutation rules", default=["rename-identifier"])
     args = argparser.parse_args()
 
     run_pipeline(args.filepath, args.rules)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
