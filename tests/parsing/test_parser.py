@@ -116,11 +116,11 @@ class TestParser:
         """Test that is_trivial identifies trivial keywords."""
         # Create mock nodes
         from unittest.mock import Mock
-        
+
         trivial_node = Mock()
         trivial_node.type = "return_statement"
         assert parser.is_trivial(trivial_node)
-        
+
         break_node = Mock()
         break_node.type = "break_statement"
         assert parser.is_trivial(break_node)
@@ -128,7 +128,7 @@ class TestParser:
     def test_is_not_trivial_assignment(self, parser):
         """Test that assignment statements are not trivial."""
         from unittest.mock import Mock
-        
+
         assignment_node = Mock()
         assignment_node.type = "assignment_expression"
         assert not parser.is_trivial(assignment_node)
@@ -138,11 +138,11 @@ class TestParser:
     def test_is_meaningful_with_keywords(self, parser):
         """Test that is_meaningful identifies meaningful keywords."""
         from unittest.mock import Mock
-        
+
         expr_node = Mock()
         expr_node.type = "binary_expression"
         assert parser.is_meaningful(expr_node)
-        
+
         decl_node = Mock()
         decl_node.type = "variable_declaration"
         assert parser.is_meaningful(decl_node)
@@ -150,7 +150,7 @@ class TestParser:
     def test_is_not_meaningful(self, parser):
         """Test that non-meaningful types return False."""
         from unittest.mock import Mock
-        
+
         binary_node = Mock()
         binary_node.type = "binary_operator"
         assert not parser.is_meaningful(binary_node)
@@ -166,7 +166,7 @@ class TestParser:
             y = x + 1
         """
         tree_obj = parser.ts_parser.parse(bytes(code, "utf8"))
-        
+
         # Find function definition in children
         func_node = find_child_with_type(tree_obj.root_node, "function_definition")
         assert func_node is not None
@@ -180,7 +180,7 @@ class TestParser:
             return
         """
         tree_obj = parser.ts_parser.parse(bytes(code, "utf8"))
-        
+
         func_node = find_child_with_type(tree_obj.root_node, "function_definition")
         assert func_node is not None
         assert not parser.has_meaningful_structure(func_node)

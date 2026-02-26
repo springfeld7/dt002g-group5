@@ -31,5 +31,5 @@ def convert_node(ts_node: TSNode, source_bytes):
         type=ts_node.type,
         text=text,
         children=[convert_node(child, source_bytes) for child in ts_node.children],
-        isNamed=ts_node.is_named
+        isNamed=ts_node.is_named,
     )

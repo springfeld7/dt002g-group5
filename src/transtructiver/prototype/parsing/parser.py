@@ -4,7 +4,6 @@ This module defines a Parser class that produces a CST using Tree-sitter
 and converts the resulting syntax tree into the project's Node structure.
 """
 
-
 from tree_sitter import Node as TSNode
 from tree_sitter import Parser as TSParser
 from tree_sitter_language_pack import get_language, SupportedLanguage
@@ -19,7 +18,7 @@ MEANINGFUL_NODE_TYPES = [
     "declaration",
     "assignment",
     "block",
-    "suite"
+    "suite",
 ]
 
 TRIVIAL_NODE_TYPES = [
@@ -51,7 +50,6 @@ class Parser:
         """
         return any(t in node.type for t in TRIVIAL_NODE_TYPES)
 
-
     def is_meaningful(self, node: TSNode):
         """Check if a node represents a meaningful code structure.
 
@@ -62,7 +60,6 @@ class Parser:
             bool: True if node type matches any meaningful structure pattern.
         """
         return any(kw in node.type for kw in MEANINGFUL_NODE_TYPES)
-
 
     def has_meaningful_structure(self, node: TSNode):
         """Determine if a node contains meaningful, non-trivial code structures.
