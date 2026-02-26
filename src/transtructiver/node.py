@@ -17,7 +17,7 @@ class Node:
     and optional text content (for leaf nodes like tokens).
 
     Attributes:
-        type (str): The node type/category (e.g., "identifier", "function_definition", "binary_expression").
+        type (str): The node type/category (e.g., "identifier", "function_definition").
         children (list): List of child Node objects. Represents the structure of the tree.
         text (str, optional): The raw token text for leaf nodes. None for non-leaf nodes.
     """
