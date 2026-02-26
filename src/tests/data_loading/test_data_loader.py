@@ -1,75 +1,79 @@
 """
 Unit tests for the DataLoader class.
 
-This module tests the main functionality of DataLoader, including:
+This module tests:
 - Successful loading of a valid Parquet file.
 - Handling of missing files (FileNotFoundError).
 - Handling of invalid files (ValueError).
 
-Temporary Parquet files are created for testing purposes using the tempfile module.
+Temporary Parquet files are created using pytest's tmp_path fixture.
 """
 
-import os
-import unittest
-from tempfile import TemporaryDirectory
-
+from pathlib import Path
 import pandas as pd
-
+from typing import Tuple
+import pytest
 from transtructiver.data_loading.data_loader import DataLoader
 
 
-class TestDataLoader(unittest.TestCase):
-    """Unit tests for the DataLoader class."""
+@pytest.fixture
+def sample_parquet(tmp_path: Path) -> Tuple[Path, pd.DataFrame]:
+    """
+    Create a temporary Parquet file with sample data.
 
-    def setUp(self):
-        """Create a temporary Parquet file for testing."""
-        self.temp_dir = TemporaryDirectory()
-        self.file_path = os.path.join(self.temp_dir.name, "test.parquet")
+    Args:
+        tmp_path (Path): Built-in pytest fixture providing a temporary directory.
 
-        # Create a simple DataFrame to write
-        self.df = pd.DataFrame(
-            {
-                "index": [0, 1],
-                "code": ["print('hello')", "x = 1 + 1"],
-                "language": ["python", "python"],
-            }
-        )
-        self.df.to_parquet(self.file_path, engine="pyarrow")
+    Returns:
+        tuple: (file_path, original_dataframe)
+    """
+    file_path = tmp_path / "test.parquet"
 
-    def tearDown(self):
-        """Clean up temporary directory."""
-        self.temp_dir.cleanup()
+    df = pd.DataFrame(
+        {
+            "index": [0, 1],
+            "code": ["print('hello')", "x = 1 + 1"],
+            "language": ["python", "python"],
+        }
+    )
 
-    def test_load_successful(self):
-        """Test that a valid Parquet file loads correctly and matches the original DataFrame."""
-        loader = DataLoader(self.file_path)
-        df_loaded = loader.load()
-
-        pd.testing.assert_frame_equal(
-            df_loaded, self.df
-        )  # Check that loaded DataFrame matches original
-        self.assertEqual(len(loader.df), 2)  # Check that the number of rows loaded is correct
-
-    def test_load_missing_file(self):
-        """Test that loading a non-existent file raises FileNotFoundError."""
-        missing_path = os.path.join(self.temp_dir.name, "missing.parquet")
-
-        loader = DataLoader(missing_path)
-
-        with self.assertRaises(FileNotFoundError):
-            loader.load()
-
-    def test_load_invalid_file(self):
-        """Test that loading an invalid file raises a proper error."""
-        invalid_parquet = os.path.join(self.temp_dir.name, "invalid.parquet")
-        with open(invalid_parquet, "w") as f:
-            f.write("not a parquet file")
-
-        loader = DataLoader(invalid_parquet)
-
-        with self.assertRaises(ValueError):
-            loader.load()
+    df.to_parquet(file_path, engine="pyarrow")
+    return file_path, df
 
 
-if __name__ == "__main__":
-    unittest.main()
+def test_load_successful(sample_parquet):
+    """
+    Test that a valid Parquet file loads correctly
+    and matches the original DataFrame.
+    """
+    file_path, original_df = sample_parquet
+
+    loader = DataLoader(str(file_path))
+    df_loaded = loader.load()
+
+    pd.testing.assert_frame_equal(df_loaded, original_df)
+    assert len(loader.df) == 2
+
+
+def test_load_missing_file(tmp_path):
+    """
+    Test that loading a non-existent file raises FileNotFoundError.
+    """
+    missing_path = tmp_path / "missing.parquet"
+    loader = DataLoader(str(missing_path))
+
+    with pytest.raises(FileNotFoundError):
+        loader.load()
+
+
+def test_load_invalid_file(tmp_path):
+    """
+    Test that loading an invalid file raises ValueError.
+    """
+    invalid_file = tmp_path / "invalid.parquet"
+    invalid_file.write_text("not a parquet file")
+
+    loader = DataLoader(str(invalid_file))
+
+    with pytest.raises(ValueError):
+        loader.load()
