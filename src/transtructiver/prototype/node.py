@@ -18,7 +18,7 @@ class Node:
         text (str, optional): The raw token text for leaf nodes. None for non-leaf nodes.
     """
 
-    def __init__(self, type, children=None, text=None):
+    def __init__(self, type, children=None, text=None, isNamed=False):
         """Initialize a new Node.
 
         Args:
@@ -29,6 +29,7 @@ class Node:
         self.type = type
         self.children = children or []
         self.text = text
+        self.isNamed = isNamed
 
     def add_child(self, child):
         """Add a child node to this node.
@@ -90,7 +91,7 @@ class Node:
         prefix = "  " * indent
         line = f"{prefix}{self.type}"
 
-        if self.text is not None:
+        if self.text is not None and self.isNamed:
             line += f": {self.text}"
 
         print(line)
