@@ -44,4 +44,5 @@ build-backend = "uv_build"
 [dependency-groups]
 dev = [
     "black==24.1.0",
+    "pytest>=9.0.2",
 ]
