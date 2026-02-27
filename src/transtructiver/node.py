@@ -22,7 +22,7 @@ class Node:
         text (str, optional): The raw token text for leaf nodes. None for non-leaf nodes.
     """
 
-    def __init__(self, type, children=None, text=None):
+    def __init__(self, type, children=None, text=None, is_named=False):
         """
         Initialize a new Node.
 
@@ -30,10 +30,12 @@ class Node:
             type (str): The node type/category identifier.
             children (list, optional): List of child Node objects. Defaults to empty list if None.
             text (str, optional): Raw token text for leaf nodes. Defaults to None.
+            is_named (bool, optional): Whether the node is a named node. Defaults to False.
         """
         self.type = type
         self.children = children or []
         self.text = text
+        self.is_named = is_named
 
     def add_child(self, child):
         """
@@ -99,7 +101,7 @@ class Node:
         prefix = "  " * indent
         line = f"{prefix}{self.type}"
 
-        if self.text is not None:
+        if self.text is not None and self.is_named:
             line += f": {self.text}"
 
         print(line)
