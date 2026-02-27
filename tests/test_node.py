@@ -16,34 +16,30 @@ from transtructiver.node import Node
 
 
 def test_node_initialization():
-    """
-    Verify that a node correctly stores type, text, and children.
-    """
-    node = Node("identifier", text="x")
+    """Verify that a node correctly stores type, text, and children."""
+    node = Node("identifier", text="x", is_named=True)
 
     assert node.type == "identifier"
     assert node.text == "x"
     assert node.children == []
+    assert node.is_named is True
 
 
 def test_add_child():
-    """
-    Verify that children are correctly appended to the children list.
-    """
+    """Verify that children are correctly appended to the children list."""
     root = Node("binary_expression")
-    child = Node("number", text="5")
+    child = Node("number", text="5", is_named=True)
 
     root.add_child(child)
 
     assert len(root.children) == 1
     assert root.children[0].type == "number"
     assert root.children[0].text == "5"
+    assert root.children[0].is_named is True
 
 
 def test_traverse_preorder():
-    """
-    Verify preorder traversal: Root -> Left Child -> Left Child's Children -> Right Child.
-    """
+    """Verify preorder traversal: Root -> Left Child -> Left Child's Children -> Right Child."""
     # Build: root(A) -> [child(B), child(C) -> [grandchild(D)]]
     root = Node("A")
     child_b = Node("B")
@@ -60,9 +56,7 @@ def test_traverse_preorder():
 
 
 def test_clone_deep_copy():
-    """
-    Verify that cloning creates a deep copy, not a shallow reference.
-    """
+    """Verify that cloning creates a deep copy, not a shallow reference."""
     root = Node("root")
     child = Node("child", text="original")
     root.add_child(child)
@@ -83,9 +77,7 @@ def test_clone_deep_copy():
 
 
 def test_node_with_multiple_children_init():
-    """
-    Verify initializing a node with a pre-defined list of children.
-    """
+    """Verify initializing a node with a pre-defined list of children."""
     children = [Node("int", text="1"), Node("int", text="2")]
 
     root = Node("list", children=children)
@@ -96,9 +88,7 @@ def test_node_with_multiple_children_init():
 
 
 def test_traverse_single_node():
-    """
-    Ensure traversal works even if there are no children.
-    """
+    """Ensure traversal works even if there are no children."""
     node = Node("leaf")
 
     result = list(node.traverse())
