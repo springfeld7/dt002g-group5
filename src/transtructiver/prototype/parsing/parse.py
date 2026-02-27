@@ -10,10 +10,13 @@ from .parser import Parser
 def main():
     """Run a simple parsing demo and print the CST."""
     parser = Parser()
-    cst = parser.parse("def add(a, b): return a + b", "python")
+    cst, discard_reason = parser.parse("void f() { return; } void f() { int x = 0; }", "cpp")
 
-    print("Parsed CST:")
-    cst.pretty()
+    if cst is not None:
+        print("Parsed CST:")
+        cst.pretty()
+    else:
+        print(f"Invalid snippet, reason to discard: {discard_reason}")
 
 
 if __name__ == "__main__":

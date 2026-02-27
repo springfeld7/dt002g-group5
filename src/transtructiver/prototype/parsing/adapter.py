@@ -4,10 +4,11 @@ This module provides a conversion function that maps Tree-sitter's node
 representation into the project's internal Node structure.
 """
 
+from tree_sitter import Node as TSNode
 from ..node import Node
 
 
-def convert_node(ts_node, source_bytes):
+def convert_node(ts_node: TSNode, source_bytes):
     """Convert an external parser node into a local Node tree.
 
     The conversion is recursive. Leaf nodes (with zero children) preserve their
@@ -30,4 +31,5 @@ def convert_node(ts_node, source_bytes):
         type=ts_node.type,
         text=text,
         children=[convert_node(child, source_bytes) for child in ts_node.children],
+        isNamed=ts_node.is_named,
     )
