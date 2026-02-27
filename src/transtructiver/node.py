@@ -28,7 +28,7 @@ class Node:
         children: Optional[List[Node]] = None,
         text: Optional[str] = None,
         is_named: bool = False,
-    ):
+    ) -> None:
         """
         Initialize a new Node.
 
@@ -43,7 +43,7 @@ class Node:
         self.text: Optional[str] = text
         self.is_named: bool = is_named
 
-    def add_child(self, child: Node):
+    def add_child(self, child: Node) -> None:
         """
         Add a child node to this node.
 
@@ -88,7 +88,7 @@ class Node:
         """
         return f"Node(type={self.type}, text={self.text})"
 
-    def pretty(self, indent: int = 0):
+    def pretty(self, indent: int = 0) -> None:
         """
         Print a human-readable tree representation of this node and its children.
 
