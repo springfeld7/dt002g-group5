@@ -5,7 +5,7 @@ This module defines the fundamental Node class used throughout the project
 to represent hierarchical code structures.
 """
 
-from typing import Iterator
+from typing import Iterator, List, Optional
 
 
 class Node:
@@ -22,7 +22,13 @@ class Node:
         text (str, optional): The raw token text for leaf nodes. None for non-leaf nodes.
     """
 
-    def __init__(self, type, children=None, text=None, is_named=False):
+    def __init__(
+        self,
+        type: str,
+        children: Optional[List[Node]] = None,
+        text: Optional[str] = None,
+        is_named: bool = False,
+    ):
         """
         Initialize a new Node.
 
@@ -32,12 +38,12 @@ class Node:
             text (str, optional): Raw token text for leaf nodes. Defaults to None.
             is_named (bool, optional): Whether the node is a named node. Defaults to False.
         """
-        self.type = type
-        self.children = children or []
-        self.text = text
-        self.is_named = is_named
+        self.type: str = type
+        self.children: List[Node] = children or []
+        self.text: Optional[str] = text
+        self.is_named: bool = is_named
 
-    def add_child(self, child):
+    def add_child(self, child: Node):
         """
         Add a child node to this node.
 
@@ -82,7 +88,7 @@ class Node:
         """
         return f"Node(type={self.type}, text={self.text})"
 
-    def pretty(self, indent=0):
+    def pretty(self, indent: int = 0):
         """
         Print a human-readable tree representation of this node and its children.
 

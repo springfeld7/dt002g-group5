@@ -12,7 +12,7 @@ Tests cover both typical usage and boundary conditions to ensure
 the Node class reliably supports tree construction and manipulation.
 """
 
-from transtructiver.node import Node
+from src.transtructiver.node import Node
 
 
 def test_node_initialization():
