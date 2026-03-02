@@ -9,6 +9,7 @@ from tree_sitter import Parser as TSParser
 from tree_sitter_language_pack import get_language, SupportedLanguage
 from typing import cast
 from .adapter import convert_node
+from ..node import Node
 
 
 MEANINGFUL_NODE_TYPES = [
@@ -19,6 +20,8 @@ MEANINGFUL_NODE_TYPES = [
     "assignment",
     "block",
     "suite",
+    "lambda",
+    "list_comprehension",
 ]
 
 TRIVIAL_NODE_TYPES = [
@@ -26,6 +29,7 @@ TRIVIAL_NODE_TYPES = [
     "break",
     "continue",
     "empty",
+    "comment",
 ]
 
 
@@ -39,71 +43,87 @@ class Parser:
     def __init__(self):
         self.ts_parser = TSParser()
 
-    def is_trivial(self, node: TSNode):
-        """Check if a node represents a trivial statement.
+    # ------------------------------------------------------------
+    # Meaningful / trivial checks
+    # ------------------------------------------------------------
+
+    def is_trivial(self, node: TSNode) -> bool:
+        """Check if a node represents trivial code.
+
+        Trivial nodes are those that don't contribute meaningful logic,
+        such as return statements without expressions, breaks, continues,
+        empty statements, or comments.
 
         Args:
-            node (TSNode): Tree-sitter node to check.
+            node (TSNode): The Tree-sitter node to check.
 
         Returns:
-            bool: True if node type matches any trivial statement pattern.
+            bool: True if the node type matches any trivial pattern.
         """
         return any(t in node.type for t in TRIVIAL_NODE_TYPES)
 
-    def is_meaningful(self, node: TSNode):
-        """Check if a node represents a meaningful code structure.
+    def is_meaningful(self, node: TSNode) -> bool:
+        """Check if a node represents meaningful code.
+
+        Meaningful nodes contain substantive logic such as expressions,
+        statements, definitions, declarations, assignments, blocks, or
+        lambda expressions.
 
         Args:
-            node (TSNode): Tree-sitter node to check.
+            node (TSNode): The Tree-sitter node to check.
 
         Returns:
-            bool: True if node type matches any meaningful structure pattern.
+            bool: True if the node type matches any meaningful pattern.
         """
         return any(kw in node.type for kw in MEANINGFUL_NODE_TYPES)
 
-    def has_meaningful_structure(self, node: TSNode):
-        """Determine if a node contains meaningful, non-trivial code structures.
+    def has_meaningful_structure(self, node: TSNode) -> bool:
+        """Check if a node contains meaningful structure in its body.
 
-        Looks for a body block (block/suite/compound) within the node, then checks
-        if it contains at least one meaningful statement that isn't trivial.
+        This method searches for a body block (block, suite, or compound)
+        within the node, then checks if that body contains any meaningful
+        non-trivial children. If no body is found, it checks the node's
+        direct children.
 
         Args:
-            node (TSNode): Tree-sitter node to analyze.
+            node (TSNode): The Tree-sitter node to analyze.
 
         Returns:
-            bool: True if the node contains at least one meaningful, non-trivial statement.
+            bool: True if the node contains at least one meaningful,
+                non-trivial child in its body or direct children.
         """
-        # Check if body exists
         body = None
         for child in node.children:
             if any(kw in child.type for kw in ["block", "suite", "compound"]):
                 body = child
                 break
 
-        # Set the target node
         target = body if body else node
 
-        # Ensure target contains at least one meaningful non-trivial node
         for child in target.named_children:
             if self.is_meaningful(child) and not self.is_trivial(child):
                 return True
 
         return False
 
-    def should_discard(self, root: TSNode, source):
-        """Determine if a parsed tree should be discarded based on quality criteria.
+    def should_discard(self, root: TSNode, source: str) -> str | None:
+        """Determine if a parse tree should be discarded.
 
-        Checks for various conditions that indicate the source code snippet is not
-        suitable for further processing (e.g., empty, all errors, no meaningful content).
+        Applies filtering logic to reject parse trees that don't contain
+        useful code, such as empty sources, root-level errors, or code
+        without meaningful structure.
 
         Args:
-            root (TSNode): The root Tree-sitter node of the parsed tree.
+            root (TSNode): The root Tree-sitter node of the parse tree.
             source (str): The original source code string.
 
         Returns:
-            str | None: A reason string if the tree should be discarded, None if valid.
-                Possible reasons: "empty_source", "no_children", "root_error_only",
-                "no_meaningful_structure".
+            str | None: A reason string if the tree should be discarded:
+                - "empty_source": Source contains only whitespace
+                - "no_children": Root has no child nodes
+                - "root_error_only": All root children are error nodes
+                - "no_meaningful_structure": No children have meaningful structure
+                None if the tree should be kept.
         """
         if not source.strip():
             return "empty_source"
@@ -111,7 +131,6 @@ class Parser:
         if root.child_count < 1:
             return "no_children"
 
-        # Get first node of the tree
         if all(child.is_error for child in root.children):
             return "root_error_only"
 
@@ -120,40 +139,53 @@ class Parser:
 
         return None
 
-    def parse(self, code: str, language: str):
-        """Parse source code into a CST.
+    # ------------------------------------------------------------
+    # Parse
+    # ------------------------------------------------------------
+
+    def parse(self, code: str, language: str) -> tuple[Node, None] | tuple[None, str]:
+        """Parse source code into a Concrete Syntax Tree (CST).
+
+        Parses the provided source code using Tree-sitter, applies
+        filtering logic, and converts the result into the project's Node
+        structure.
 
         Args:
             code (str): The source code to parse.
-            language (str): A Tree-sitter language name supported by the
-                language pack, e.g. "python".
+            language (str): The programming language (e.g., "python", "java").
 
         Returns:
-            Node: The root of the parsed CST.
+            tuple[Node, None] | tuple[None, str]: On success, returns
+                (Node, None) where Node is the root of the CST. On failure,
+                returns (None, reason) where reason is one of:
+                - "invalid_utf8": Code contains invalid UTF-8
+                - "empty_source": Source is empty or whitespace-only
+                - "no_children": Parse tree has no children
+                - "root_error_only": All children are parse errors
+                - "no_meaningful_structure": Code lacks meaningful content
+
+        Raises:
+            ValueError: If the specified language is not supported.
         """
         try:
             ts_language = get_language(cast(SupportedLanguage, language.lower()))
-        except KeyError:
+        except LookupError:
             raise ValueError(f"Unsupported language: {language}")
 
-        # UTF-8 encoding check
         try:
             code.encode("utf-8")
         except UnicodeEncodeError:
             return None, "invalid_utf8"
 
-        # Parse code with Tree-sitter
         self.ts_parser.language = ts_language
 
         source_bytes = bytes(code, "utf8")
         source_tree = self.ts_parser.parse(source_bytes)
         root_node = source_tree.root_node
-
-        # Apply discard criteria
+        # Discard logic
         reason = self.should_discard(root_node, code)
         if reason:
             return None, reason
 
-        # Convert valid CST and return
         converted_tree = convert_node(root_node, source_bytes)
         return converted_tree, None
