@@ -50,7 +50,7 @@ class Node:
         self.children = children or []
         self.text = text
 
-    def add_child(self, child: Node):
+    def add_child(self, child: Node) -> None:
         """
         Add a child node to this node.
 
@@ -100,7 +100,7 @@ class Node:
         """
         return f"Node(type={self.type}, text={self.text})"
 
-    def pretty(self, indent: int = 0):
+    def pretty(self, indent: int = 0) -> None:
         """
         Print a human-readable tree representation of this node and its children.
 

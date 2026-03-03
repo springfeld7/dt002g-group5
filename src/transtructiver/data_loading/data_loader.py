@@ -4,6 +4,7 @@ The DataLoader handles loading a Parquet file into a Pandas DataFrame
 and provides methods to inspect or print the loaded data.
 """
 
+from typing import Optional
 import pandas as pd
 
 
@@ -18,14 +19,14 @@ class DataLoader:
         df (pd.DataFrame): The loaded DataFrame (None until load() is called).
     """
 
-    def __init__(self, file_path: str):
+    def __init__(self, file_path: str) -> None:
         """Initialize the DataLoader with the path to the Parquet file.
 
         Args:
             file_path (str): Path to the Parquet file to load.
         """
-        self.file_path = file_path
-        self.df = None
+        self.file_path: str = file_path
+        self.df: Optional[pd.DataFrame] = None
 
     def load(self) -> pd.DataFrame:
         """Load the Parquet file into a Pandas DataFrame.
@@ -43,7 +44,7 @@ class DataLoader:
         print(f"Loaded {len(self.df)} rows from {self.file_path}")
         return self.df
 
-    def print_entries(self):
+    def print_entries(self) -> None:
         """Print all rows in the loaded DataFrame in a readable format.
 
         Raises:
@@ -66,7 +67,7 @@ class DataLoader:
             print(f"  language   : {row['language']}")
             print()
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         """Return a string representation of the DataLoader instance.
 
         Shows the file path and the number of rows currently loaded (0 if not loaded).
