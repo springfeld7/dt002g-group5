@@ -10,7 +10,13 @@ from .parser import Parser
 def main():
     """Run a simple parsing demo and print the CST."""
     parser = Parser()
-    cst, discard_reason = parser.parse("void f() { return; } void f() { int x = 0; }", "cpp")
+    cst, discard_reason = parser.parse(
+        """
+def func():
+    return x
+""",
+        "python",
+    )
 
     if cst is not None:
         print("Parsed CST:")

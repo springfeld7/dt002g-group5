@@ -17,34 +17,35 @@ from src.transtructiver.node import Node
 
 def test_node_initialization():
     """Verify that a node correctly stores type, text, and children."""
-    node = Node("identifier", text="x", is_named=True)
+    node = Node((0, 0), (0, 1), "identifier", text="x")
 
+    assert node.start_point == (0, 0)
+    assert node.end_point == (0, 1)
     assert node.type == "identifier"
     assert node.text == "x"
     assert node.children == []
-    assert node.is_named is True
 
 
 def test_add_child():
     """Verify that children are correctly appended to the children list."""
-    root = Node("binary_expression")
-    child = Node("number", text="5", is_named=True)
+    root = Node((0, 0), (0, 1), "binary_expression")
+    child = Node((0, 1), (0, 2), "number", text="5")
 
     root.add_child(child)
 
     assert len(root.children) == 1
     assert root.children[0].type == "number"
     assert root.children[0].text == "5"
-    assert root.children[0].is_named is True
 
 
 def test_traverse_preorder():
     """Verify preorder traversal: Root -> Left Child -> Left Child's Children -> Right Child."""
     # Build: root(A) -> [child(B), child(C) -> [grandchild(D)]]
-    root = Node("A")
-    child_b = Node("B")
-    child_c = Node("C")
-    grandchild_d = Node("D")
+    point = (0, 0)
+    root = Node(point, point, "A")
+    child_b = Node(point, point, "B")
+    child_c = Node(point, point, "C")
+    grandchild_d = Node(point, point, "D")
 
     root.add_child(child_b)
     root.add_child(child_c)
@@ -57,8 +58,9 @@ def test_traverse_preorder():
 
 def test_clone_deep_copy():
     """Verify that cloning creates a deep copy, not a shallow reference."""
-    root = Node("root")
-    child = Node("child", text="original")
+    point = (0, 0)
+    root = Node(point, point, "root")
+    child = Node(point, point, "child", "original")
     root.add_child(child)
 
     cloned_root = root.clone()
@@ -78,9 +80,10 @@ def test_clone_deep_copy():
 
 def test_node_with_multiple_children_init():
     """Verify initializing a node with a pre-defined list of children."""
-    children = [Node("int", text="1"), Node("int", text="2")]
+    point = (0, 0)
+    children = [Node(point, point, "int", "1"), Node(point, point, "int", "2")]
 
-    root = Node("list", children=children)
+    root = Node(point, point, "list", children=children)
 
     assert len(root.children) == 2
     assert root.children[0].text == "1"
@@ -89,7 +92,7 @@ def test_node_with_multiple_children_init():
 
 def test_traverse_single_node():
     """Ensure traversal works even if there are no children."""
-    node = Node("leaf")
+    node = Node((0, 0), (0, 0), "leaf")
 
     result = list(node.traverse())
 

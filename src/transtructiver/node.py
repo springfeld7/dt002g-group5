@@ -20,15 +20,19 @@ class Node:
         type (str): The node type/category (e.g., "identifier", "function_definition").
         children (list): List of child Node objects. Represents the structure of the tree.
         text (str, optional): The raw token text for leaf nodes. None for non-leaf nodes.
+        is_named (bool): Whether the node is a named node in the grammar.
+        start_point (tuple[int, int]): Starting position as (row, column).
+        end_point (tuple[int, int]): Ending position as (row, column).
     """
 
     def __init__(
         self,
+        start_point: tuple[int, int],
+        end_point: tuple[int, int],
         type: str,
-        children: Optional[List[Node]] = None,
         text: Optional[str] = None,
-        is_named: bool = False,
-    ) -> None:
+        children: Optional[List[Node]] = None,
+    ):
         """
         Initialize a new Node.
 
@@ -37,11 +41,14 @@ class Node:
             children (list, optional): List of child Node objects. Defaults to empty list if None.
             text (str, optional): Raw token text for leaf nodes. Defaults to None.
             is_named (bool, optional): Whether the node is a named node. Defaults to False.
+            start_point (tuple[int, int]): Starting position as (row, column).
+            end_point (tuple[int, int]): Ending position as (row, column).
         """
-        self.type: str = type
-        self.children: List[Node] = children or []
-        self.text: Optional[str] = text
-        self.is_named: bool = is_named
+        self.start_point = start_point
+        self.end_point = end_point
+        self.type = type
+        self.children = children or []
+        self.text = text
 
     def add_child(self, child: Node) -> None:
         """
@@ -74,7 +81,12 @@ class Node:
             Node: A new instance of Node with identical type, text, and
                 recursively cloned children.
         """
-        new_node = Node(self.type, text=self.text)
+        new_node = Node(
+            self.start_point,
+            self.end_point,
+            self.type,
+            self.text,
+        )
         new_node.children = [child.clone() for child in self.children]
 
         return new_node
@@ -95,22 +107,19 @@ class Node:
         This method recursively prints the tree structure with proper indentation.
         Each level of nesting is indented by 2 spaces.
 
-        Args:
-            indent (int, optional): Current indentation level. Defaults to 0 (root level).
-                Used internally for recursive calls.
-
         Example:
             >>> node = Node("function_definition", text="add")
             >>> node.pretty()
             function_definition: add
         """
         prefix = "  " * indent
-        line = f"{prefix}{self.type}"
+        if (self.type != "newline") and (self.type != "whitespace"):
+            line = f"{prefix}{self.type}"
 
-        if self.text is not None and self.is_named:
-            line += f": {self.text}"
+            if self.text and not self.text == self.type:
+                line += f": {self.text}"
 
-        print(line)
+            print(line)
 
         for child in self.children:
             child.pretty(indent + 1)
