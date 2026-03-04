@@ -28,44 +28,52 @@ def test_concrete_rule_implementation():
 
     class RenameVariableRule(MutationRule):
         def apply(self, root) -> List[MutationRecord]:
+            # Now returning an actual object, not a dict
             return [
-                {
-                    "node_id": (10, 5),
-                    "action": MutationAction.RENAME,
-                    "metadata": {"new_text": "x_var"},
-                }
+                MutationRecord(
+                    node_id=(10, 5),
+                    action=MutationAction.RENAME,
+                    metadata={"new_val": "x_var"},  # Fixed key from 'new_text' to 'new_val'
+                )
             ]
 
     rule = RenameVariableRule()
 
-    # Verify automatic name assignment in __init__
+    rule = RenameVariableRule()
     assert rule.name == "RenameVariableRule"
 
-    # Verify return structure
     results = rule.apply(None)
-    assert isinstance(results, list)
-    assert results[0]["node_id"] == (10, 5)
-    assert results[0]["action"] == MutationAction.RENAME
+    assert isinstance(results[0], MutationRecord)
+    assert results[0].node_id == (10, 5)
+    assert results[0].action == MutationAction.RENAME
 
 
 def test_synthetic_node_record():
-    """Verify that node_id can be None for synthetic/inserted nodes."""
+    """Verify synthetic nodes can use negative coordinates"""
 
     class InsertDeadCodeRule(MutationRule):
         def apply(self, root) -> List[MutationRecord]:
             return [
-                {
-                    "node_id": None,
-                    "action": MutationAction.INSERT,
-                    "metadata": {"path": "0.1", "type": "opaque_predicate"},
-                }
+                MutationRecord(
+                    node_id=(-1, -1),
+                    action=MutationAction.INSERT,
+                    metadata={"new_val": "pass", "node_type": "stmt"},
+                )
             ]
 
     rule = InsertDeadCodeRule()
     results = rule.apply(None)
 
-    assert results[0]["node_id"] is None
-    assert results[0]["action"] == MutationAction.INSERT
+    assert results[0].node_id[0] < 0
+    assert results[0].action == MutationAction.INSERT
+
+
+def test_invalid_metadata_raises_error():
+    """Verify that malformed records blow up immediately (the new behavior)."""
+    with pytest.raises(ValueError, match="missing required key"):
+        MutationRecord(
+            node_id=(1, 1), action=MutationAction.RENAME, metadata={}  # Missing 'new_val'
+        )
 
 
 def test_repr_output():

@@ -6,26 +6,33 @@ reporting mechanism for tracking changes via original source coordinates.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, TypedDict, List, Tuple
+from typing import Any, Dict, List, Tuple
 from .mutation_types import MutationAction
+from dataclasses import dataclass
+from .mutation_types import MutationAction, validate_action_metadata
 from ..node import Node
 
 
-class MutationRecord(TypedDict):
+@dataclass(frozen=True)
+class MutationRecord:
     """
-    Schema for recording a single mutation on a CST node.
+    A record of a single source code transformation.
 
     Attributes:
-        node_id (Tuple[int, int]): The unique identifier for the node.
-            - For original nodes: The (row, col) start_point.
-            - For synthetic nodes: A unique negative coordinate .
-        action (MutationAction): The mutation type (RENAME, DELETE, MOVE, INSERT).
-        metadata (Dict[str, Any]): Operation-specific data (e.g., 'new_text').
+        node_id (Tuple[int, int]): The unique coordinate identifier for the target
+            node (Original: (row, col) | Synthetic: negative coordinates).
+        action (MutationAction): The transformation type applied to the node.
+        metadata (Dict[str, Any]): Action-specific data required for verification,
+            validated against the action's schema.
     """
 
     node_id: Tuple[int, int]
     action: MutationAction
     metadata: Dict[str, Any]
+
+    def __post_init__(self):
+        """Enforce the mutation contract upon instantiation."""
+        validate_action_metadata(self.action, self.metadata)
 
 
 class MutationRule(ABC):
