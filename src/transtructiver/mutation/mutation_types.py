@@ -33,6 +33,16 @@ class MutationAction(Enum):
         """Return the action name as a plain string."""
         return self.name
 
+    @property
+    def is_structural(self) -> bool:
+        """Returns True if this action alters the tree topology."""
+        return self in {
+            MutationAction.INSERT,
+            MutationAction.DELETE,
+            MutationAction.FLATTEN,
+            MutationAction.SUBSTITUTE,
+        }
+
 
 # ==== Schema Definitions ====
 
