@@ -66,7 +66,7 @@ class MutationEngine:
             rule_name: The name of the rule, used for audit history.
         """
         for record in changes:
-            manifest.add_mutation(
+            manifest.add_entry(
                 node_id=record.node_id,
                 action=record.action,
                 metadata=record.metadata,
