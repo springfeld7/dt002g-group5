@@ -60,13 +60,18 @@ class MutationManifest:
     This class serves as a lookup table to ensure that disparate transformation
     rules can stay synchronized and avoid redundant or conflicting changes
     to the same data nodes.
+
+    Attributes:
+        _entries (Dict[Tuple[int, int], ManifestEntry]): Maps original node IDs to their mutation records.
+        _has_structural (bool): Flag indicating if any structural mutations have been recorded.
     """
 
     def __init__(self):
         """Initializes the manifest with an empty registry."""
         self._entries: Dict[Tuple[int, int], ManifestEntry] = {}
+        self._has_structural_changes = False
 
-    def add_mutation(
+    def add_entry(
         self,
         node_id: Tuple[int, int],
         action: MutationAction,
@@ -88,6 +93,9 @@ class MutationManifest:
         if node_id not in self._entries:
             self._entries[node_id] = ManifestEntry(original_id=node_id)
 
+        if action is not None and action.is_structural:
+            self._has_structural_changes = True
+
         entry = self._entries[node_id]
         entry.update(metadata, rule_name, action)
 
@@ -102,3 +110,15 @@ class MutationManifest:
             The associated ManifestEntry object or None if no mutations recorded.
         """
         return self._entries.get(node_id)
+
+    def has_structural_changes(self) -> bool:
+        """
+        Queries the manifest to determine if any topology-altering mutations
+        have been recorded.
+
+        Returns:
+            bool: True if at least one action with 'is_structural = True'
+                (e.g., INSERT, DELETE, FLATTEN, SUBSTITUTE) has been
+                added to the manifest; False otherwise.
+        """
+        return self._has_structural_changes
