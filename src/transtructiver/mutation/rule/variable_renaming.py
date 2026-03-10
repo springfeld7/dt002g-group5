@@ -4,7 +4,7 @@ Defines VariableRenaming, a concrete MutationRule that renames identifier
 nodes in a deterministic way and reports all changes as MutationRecord items.
 """
 
-from typing import Dict, List
+from typing import Any
 
 from ...node import Node
 from ..mutation_rule import MutationRecord, MutationRule
@@ -14,31 +14,39 @@ from ..mutation_types import MutationAction, _ACTION_REQUIRED_KEYS
 class VariableRenaming(MutationRule):
     """Rename identifier nodes using a generated naming scheme."""
 
-    def __init__(self) -> None:
+    def __init__(self, level: int = 0) -> None:
         super().__init__()
-        self.idx = 0
+        self.level = level
+        self.scope: list[Any] = []
 
-    def rename(self, original_name: str) -> str:
+    def add_appendage(self, node: Node) -> str:
+        """Add a suffix to the identifier name."""
+        if not node.text:
+            return ""
 
-        new_name = original_name + str(self.idx)
-        self.idx += 1
-        return new_name
+        return f"{node.text}_mut"
 
-    def apply(self, root: Node) -> List[MutationRecord]:
+    _RENAME_LEVEL = {0: add_appendage}
+
+    def apply(self, root: Node) -> list[MutationRecord]:
         """Apply identifier renaming across the provided tree root."""
         if root is None:
             return []
 
-        records: List[MutationRecord] = []
+        rename_by_level = self._RENAME_LEVEL.get(self.level)
 
-        rename_map: Dict[str, str] = {}
+        records: list[MutationRecord] = []
+
+        rename_map: dict[str, str] = {}
         for node in root.traverse():
             if node.type != "identifier" or not node.text:
                 continue
 
             original_name = node.text
             if original_name not in rename_map:
-                rename_map[original_name] = self.rename(original_name)
+                rename_map[original_name] = (
+                    rename_by_level(self, node) if rename_by_level else self.add_appendage(node)
+                )
 
             new_name = rename_map[original_name]
             node.text = new_name
