@@ -6,7 +6,7 @@ a verifiable history of how each node in the tree was modified.
 """
 
 from typing import List
-from .mutation_rule import MutationRecord, MutationRule
+from .rules.mutation_rule import MutationRecord, MutationRule
 from .mutation_manifest import MutationManifest
 from ..node import Node
 
