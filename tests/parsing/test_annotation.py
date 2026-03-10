@@ -508,6 +508,44 @@ x = 5  # Inline comment
         assert labels1 == labels2
 
 
+class TestUnifiedScopeLabels:
+    """Test suite for unified semantic labels across language-specific node types."""
+
+    def test_python_function_definition_has_function_scope_label(self):
+        """Python function_definition should map to unified function_scope label."""
+        code = "def foo(x): return x"
+        node = parse_and_convert(code, "python")
+        annotated = annotate_python(node)
+
+        func_defs = [n for n in annotated.traverse() if n.type == "function_definition"]
+        assert len(func_defs) == 1
+        assert func_defs[0].semantic_label == "function_scope"
+
+    def test_java_method_declaration_has_function_scope_label(self):
+        """Java method_declaration should map to unified function_scope label."""
+        code = """
+public class Foo {
+    public void bar() { }
+}
+"""
+        node = parse_and_convert(code, "java")
+        annotated = annotate_java(node)
+
+        method_nodes = [n for n in annotated.traverse() if n.type == "method_declaration"]
+        assert len(method_nodes) == 1
+        assert method_nodes[0].semantic_label == "function_scope"
+
+    def test_cpp_function_definition_has_function_scope_label(self):
+        """C++ function_definition should map to unified function_scope label."""
+        code = "int foo() { return 1; }"
+        node = parse_and_convert(code, "cpp")
+        annotated = annotate_cpp(node)
+
+        func_defs = [n for n in annotated.traverse() if n.type == "function_definition"]
+        assert len(func_defs) == 1
+        assert func_defs[0].semantic_label == "function_scope"
+
+
 class TestAnnotationIntegration:
     """Integration tests for full annotation pipeline."""
 

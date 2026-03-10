@@ -11,7 +11,8 @@ from typing import cast
 from .adapter import convert_node
 from ..node import Node
 
-
+# Keywords used to identify nodes with meaningful code logic.
+# These patterns match node types that represent substantive program constructs.
 MEANINGFUL_NODE_TYPES = [
     "expression",
     "statement",
@@ -25,6 +26,8 @@ MEANINGFUL_NODE_TYPES = [
     "identifier",
 ]
 
+# Keywords used to identify nodes with trivial content.
+# These patterns match node types that don't significantly contribute to code logic.
 TRIVIAL_NODE_TYPES = [
     "return",
     "break",
@@ -38,10 +41,20 @@ class Parser:
     """Parser that produces a Concrete Syntax Tree (CST).
 
     The implementation uses Tree-sitter as the parsing backend and
-    adapts the resulting tree into the local Node model.
+    adapts the resulting tree into the local Node model. Provides methods
+    for classifying nodes as meaningful/trivial and filtering parse trees
+    based on code quality and structure.
+
+    Attributes:
+        ts_parser (TSParser): The underlying Tree-sitter parser instance.
     """
 
     def __init__(self):
+        """Initialize the Parser with a new Tree-sitter parser instance.
+
+        Sets up the base parser that will be configured with language-specific
+        grammars during parse() calls.
+        """
         self.ts_parser = TSParser()
 
     # ------------------------------------------------------------
@@ -61,15 +74,6 @@ class Parser:
         Returns:
             bool: True if the node type matches any trivial pattern.
         """
-        # # Return statements with meaningful values are not trivial
-        # if node.type == "return_statement":
-        #     # Check if the return value is meaningful (not just a simple identifier)
-        #     if node.named_child_count > 0:
-        #         return_value = node.named_children[0]
-        #         # If the return value is meaningful (expression, call, etc.), not trivial
-        #         if self.is_meaningful(return_value):
-        #             return False
-
         return any(t in node.type for t in TRIVIAL_NODE_TYPES)
 
     def is_meaningful(self, node: TSNode) -> bool:

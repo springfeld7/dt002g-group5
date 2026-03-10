@@ -1,7 +1,11 @@
 """Adapter utilities for converting Tree-sitter nodes to internal Nodes.
 
-This module provides a conversion function that maps Tree-sitter's node
-representation into the project's internal Node structure.
+This module handles the conversion of Tree-sitter's native node representation
+into the internal Node model used by the mutation engine. Key features:
+- Converts Language Server Protocol (LSP) Point coordinates to (row, col) tuples
+- Creates separate whitespace/newline nodes for source fidelity
+- Preserves field name information from Tree-sitter parents
+- Maintains parent-child relationships in the output tree
 """
 
 from tree_sitter import Node as TSNode, Point
