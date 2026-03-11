@@ -23,6 +23,7 @@ MEANINGFUL_NODE_TYPES = [
     "lambda",
     "list_comprehension",
     "identifier",
+    "call",
 ]
 
 TRIVIAL_NODE_TYPES = [

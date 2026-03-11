@@ -15,21 +15,18 @@ Annotation approach:
 
 from ...node import Node
 from .annotator import ROOT_TO_LANGUAGE, get_naming_ancestor_label, get_unified_type_label
+from .annotation_utils import walk
 
 
 def _annotate_node(node: Node) -> None:
-    """Recursively annotate a Python node and its children with semantic labels.
+    """Annotate a single Python node with semantic labels.
 
-    Uses post-order traversal (children before parent) to ensure scope-related
-    nodes are identified before processing their children's context. This allows
-    accurate labeling of identifiers based on their enclosing scopes.
+    Processes one node at a time; traversal is handled externally by
+    :func:`annotate_python` using :func:`~.annotation_utils.walk`.
 
     Args:
-        node (Node): The node to annotate. All children are annotated recursively.
+        node (Node): The node to annotate.
     """
-    for child in node.children:
-        _annotate_node(child)
-
     if node.type in ("whitespace", "newline"):
         return
 
@@ -217,9 +214,10 @@ def _label_for_naming_ancestor(node: Node, naming_ancestor: Node) -> str | None:
 def annotate_python(node: Node) -> Node:
     """Annotate a Python syntax tree with semantic labels.
 
-    Main entry point for Python semantic annotation. Recursively processes
-    the entire tree, assigning semantic labels to all identifiers and
-    scope-defining nodes based on Python-specific syntax patterns.
+    Main entry point for Python semantic annotation. Processes the entire
+    tree in post-order (children before parent) using :func:`~.annotation_utils.walk`,
+    assigning semantic labels to all identifiers and scope-defining nodes
+    based on Python-specific syntax patterns.
 
     Args:
         node (Node): The root of the Python syntax tree (module node).
@@ -227,5 +225,6 @@ def annotate_python(node: Node) -> Node:
     Returns:
         Node: The same tree with semantic_label attributes set throughout.
     """
-    _annotate_node(node)
+    for n in walk(node):
+        _annotate_node(n)
     return node

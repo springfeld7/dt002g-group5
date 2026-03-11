@@ -8,7 +8,7 @@ Usage:
 """
 
 from ..mock.mock_cst import cst
-from .rule.rename_identifiers import RenameIdentifiersRule
+from .rules.identifier_renaming.rename_identifiers import RenameIdentifiersRule
 from .mutation_engine import MutationEngine
 
 
@@ -21,17 +21,12 @@ def main():
     3. Creates a MutationEngine with RenameIdentifiersRule
     4. Applies the mutation rules to transform the tree
     5. Prints the mutated tree structure
-
-    The mutation rule prefixes all identifiers with "x_", so:
-    - 'add' becomes 'x_add'
-    - 'a' becomes 'x_a'
-    - 'b' becomes 'x_b'
     """
     print("Before mutation:")
     cst.pretty()
 
     engine = MutationEngine([RenameIdentifiersRule()])
-    engine.applyMutations(cst)
+    engine.apply_mutations(cst)
 
     print("\nAfter mutation:")
     cst.pretty()
