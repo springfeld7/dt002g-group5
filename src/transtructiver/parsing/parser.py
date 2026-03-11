@@ -8,7 +8,7 @@ from tree_sitter import Node as TSNode
 from tree_sitter import Parser as TSParser
 from tree_sitter_language_pack import get_language, SupportedLanguage
 from typing import cast
-from .adapter import convert_node
+from .adapter import adapt
 from ..node import Node
 
 # Keywords used to identify nodes with meaningful code logic.
@@ -203,5 +203,5 @@ class Parser:
         if reason:
             return None, reason
 
-        converted_tree = convert_node(root_node, source_bytes)
+        converted_tree = adapt(root_node, source_bytes)
         return converted_tree, None

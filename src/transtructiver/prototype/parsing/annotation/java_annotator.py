@@ -13,7 +13,7 @@ Annotation approach:
 """
 
 from ...node import Node
-from .annotator import _ROOT_TO_LANGUAGE, get_naming_ancestor_label, get_unified_type_label
+from .annotator import ROOT_TO_LANGUAGE, get_naming_ancestor_label, get_unified_type_label
 
 
 def _annotate_node(node: Node) -> None:
@@ -31,10 +31,14 @@ def _annotate_node(node: Node) -> None:
 
     if node.type in ("whitespace", "newline"):
         return
+    
+    if node.type in ("line_comment", "block_comment"):
+        node.semantic_label = "comment"
+        return
 
     parent = node.parent
     if parent is None:
-        if node.type in _ROOT_TO_LANGUAGE:
+        if node.type in ROOT_TO_LANGUAGE:
             node.semantic_label = "root"
         return
 
