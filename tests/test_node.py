@@ -12,6 +12,7 @@ Tests cover both typical usage and boundary conditions to ensure
 the Node class reliably supports tree construction and manipulation.
 """
 
+import pytest
 from src.transtructiver.node import Node
 
 
@@ -36,6 +37,56 @@ def test_add_child():
     assert len(root.children) == 1
     assert root.children[0].type == "number"
     assert root.children[0].text == "5"
+
+
+def test_remove_child_removes_existing_child():
+    """
+    Verify that remove_child correctly removes a child node.
+
+    The method should remove the specified child from the parent's
+    children list while leaving other children unchanged.
+    """
+    parent = Node((0, 0), (0, 0), "parent")
+
+    child1 = Node((1, 0), (1, 1), "child1")
+    child2 = Node((2, 0), (2, 1), "child2")
+
+    parent.add_child(child1)
+    parent.add_child(child2)
+
+    parent.remove_child(child1)
+
+    assert parent.children == [child2]
+
+
+def test_remove_child_from_single_child_parent():
+    """
+    Verify that removing the only child leaves the parent with
+    an empty children list.
+    """
+    parent = Node((0, 0), (0, 0), "parent")
+    child = Node((1, 0), (1, 1), "child")
+
+    parent.add_child(child)
+    parent.remove_child(child)
+
+    assert parent.children == []
+
+
+def test_remove_child_raises_error_for_non_child():
+    """
+    Verify that remove_child raises ValueError when the node
+    is not a child of the parent.
+    """
+    parent = Node((0, 0), (0, 0), "parent")
+
+    child = Node((1, 0), (1, 1), "child")
+    other = Node((2, 0), (2, 1), "other")
+
+    parent.add_child(child)
+
+    with pytest.raises(ValueError):
+        parent.remove_child(other)
 
 
 def test_traverse_preorder():

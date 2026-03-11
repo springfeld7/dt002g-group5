@@ -24,22 +24,22 @@ class MutationEngine:
         """
         self.rules = rules
 
-    def applyMutations(self, cst):
-        """Apply all mutation rules to the given CST.
+    def applyMutations(self, cst: Node) -> Dict[Tuple[int, int], ManifestEntry]:
+        """Apply all mutation rules to the given CST in-place.
 
-        Rules are applied sequentially. The output of one rule becomes the input
-        to the next rule. This allows for composable transformations.
+        Rules are applied sequentially. This method populates the Master Manifest
+        by aggregating change records from each rule, which serves as the
+        source of truth for downstream verification.
 
         Args:
-            cst (Node): The root node of the Concrete Syntax Tree to mutate.
+            cst (Node): The root node of the CST to mutate.
 
         Returns:
-            Node: The transformed syntax tree after all rules have been applied.
-
-        Example:
-            >>> engine = MutationEngine([RenameIdentifiersRule()])
-            >>> mutated_tree = engine.applyMutations(original_tree)
+            Dict[Tuple[int, int], ManifestEntry]: The complete Master Manifest.
         """
         for rule in self.rules:
-            cst = rule.apply(cst)
-        return cst
+            # The rule modifies the 'cst' object in memory
+            local_changes = rule.apply(cst)
+            self._merge_to_manifest(local_changes, rule.name)
+
+        return self.manifest

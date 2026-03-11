@@ -13,7 +13,7 @@ interface contract before integration into the MutationEngine.
 
 import pytest
 from typing import List
-from src.transtructiver.mutation.mutation_rule import MutationRule, MutationRecord
+from src.transtructiver.mutation.rules.mutation_rule import MutationRule, MutationRecord
 from src.transtructiver.mutation.mutation_types import MutationAction
 
 

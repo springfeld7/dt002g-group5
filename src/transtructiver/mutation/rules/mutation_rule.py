@@ -7,10 +7,10 @@ reporting mechanism for tracking changes via original source coordinates.
 
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Tuple
-from .mutation_types import MutationAction
+from ..mutation_types import MutationAction
 from dataclasses import dataclass
-from .mutation_types import MutationAction, validate_action_metadata
-from ..node import Node
+from ..mutation_types import MutationAction, validate_action_metadata
+from ...node import Node
 
 
 @dataclass(frozen=True)

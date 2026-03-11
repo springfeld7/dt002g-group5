@@ -27,6 +27,14 @@ def test_rename_valid_metadata():
     assert validate_action_metadata(MutationAction.RENAME, metadata)
 
 
+def test_delete_valid_metadata():
+    """
+    Test that DELETE accepts valid metadata containing required keys.
+    """
+    metadata = {"node_type": "comment", "content": "// a comment"}
+    assert validate_action_metadata(MutationAction.DELETE, metadata)
+
+
 def test_insert_valid_metadata():
     """
     Test that INSERT accepts valid metadata.
@@ -193,3 +201,25 @@ def test_extra_top_level_keys_allowed():
     }
 
     assert validate_action_metadata(MutationAction.RENAME, metadata)
+
+
+# ==== MutationAction Properties ====
+
+
+@pytest.mark.parametrize(
+    "action,expected",
+    [
+        (MutationAction.INSERT, True),
+        (MutationAction.DELETE, True),
+        (MutationAction.FLATTEN, True),
+        (MutationAction.SUBSTITUTE, True),
+        (MutationAction.RENAME, False),
+        (MutationAction.REFORMAT, False),
+    ],
+)
+def test_is_structural_property(action, expected):
+    """
+    Ensure that the is_structural property returns True for structural actions
+    and False for non-structural actions.
+    """
+    assert action.is_structural == expected
