@@ -14,7 +14,7 @@ from ..mutation_types import MutationAction
 from ...node import Node
 
 
-class CommentDeletion(MutationRule):
+class CommentDeletionRule(MutationRule):
     """
     Concrete mutation rule that deletes all comment nodes from a CST.
 

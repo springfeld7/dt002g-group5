@@ -6,7 +6,7 @@ and preserves non-comment nodes.
 """
 
 import pytest
-from src.transtructiver.mutation.rules.comment_deletion import CommentDeletion
+from src.transtructiver.mutation.rules.comment_deletion import CommentDeletionRule
 from src.transtructiver.mutation.rules.mutation_rule import MutationRecord
 from src.transtructiver.mutation.mutation_types import MutationAction
 from src.transtructiver.node import Node
@@ -65,8 +65,8 @@ def collect_node_types(root: Node):
 
 @pytest.fixture
 def comment_rule():
-    """Fixture providing a reusable CommentDeletion instance."""
-    return CommentDeletion()
+    """Fixture providing a reusable CommentDeletionRule instance."""
+    return CommentDeletionRule()
 
 
 @pytest.fixture
