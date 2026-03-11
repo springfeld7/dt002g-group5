@@ -24,6 +24,7 @@ MEANINGFUL_NODE_TYPES = [
     "lambda",
     "list_comprehension",
     "identifier",
+    "call",
 ]
 
 # Keywords used to identify nodes with trivial content.

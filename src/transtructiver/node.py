@@ -15,15 +15,6 @@ class Node:
     A Node is a fundamental building block for representing program structure as a tree.
     Each node has a type (e.g., "identifier", "binary_expression"), optional child nodes,
     and optional text content (for leaf nodes like tokens).
-
-    Attributes:
-        type (str): The node type/category (e.g., "identifier", "function_definition").
-        children (list): List of child Node objects. Represents the structure of the tree.
-        text (str, optional): The raw token text for leaf nodes. None for non-leaf nodes.
-        is_named (bool): Whether the node is a named node in the grammar.
-        start_point (tuple[int, int]): Starting position as (row, column).
-        end_point (tuple[int, int]): Ending position as (row, column).
-        semantic_label (str, optional): Semantic label for the node (e.g., "function_name", "variable_name").
     """
 
     def __init__(
@@ -38,18 +29,18 @@ class Node:
         Initialize a new Node.
 
         Args:
-            type (str): The node type/category identifier.
-            children (list, optional): List of child Node objects. Defaults to empty list if None.
-            text (str, optional): Raw token text for leaf nodes. Defaults to None.
-            is_named (bool, optional): Whether the node is a named node. Defaults to False.
             start_point (tuple[int, int]): Starting position as (row, column).
             end_point (tuple[int, int]): Ending position as (row, column).
+            type (str): The node type/category identifier.
+            text (str, optional): Raw token text for leaf nodes. Defaults to None.
+            children (list, optional): List of child Node objects. Defaults to empty list if None.
         """
         self.start_point = start_point
         self.end_point = end_point
         self.type = type
-        self.children = children or []
         self.text = text
+        self.children = children or []
+        # Links populated during adaptation and annotation for tree navigation.
         self.parent: Optional[Node] = None
         self.semantic_label: Optional[str] = None
         self.field: Optional[str] = None
