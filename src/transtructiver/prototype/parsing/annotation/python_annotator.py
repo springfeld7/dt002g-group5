@@ -34,7 +34,7 @@ def _annotate_node(node: Node) -> None:
         return
 
     if node.type == "comment":
-        node.semantic_label = "comment"
+        node.semantic_label = "line_comment"
         return
 
     parent = node.parent
@@ -46,7 +46,7 @@ def _annotate_node(node: Node) -> None:
     if node.type == "string" and parent.type in ("module", "block"):
         for child in node.children:
             if child.type in {"string_start", "string_end"} and child.text in ('"""', "'''"):
-                node.semantic_label = "comment"
+                node.semantic_label = "block_comment"
         return
 
     if node.type == "identifier":

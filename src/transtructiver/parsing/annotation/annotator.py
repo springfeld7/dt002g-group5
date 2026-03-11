@@ -15,6 +15,8 @@ Key concepts:
 - Lazy-loaded annotators prevent circular imports
 """
 
+from collections.abc import Callable
+
 from ...node import Node
 
 
@@ -168,45 +170,41 @@ def get_naming_ancestor_label(language: str, ancestor_type: str) -> str | None:
     return NAMING_ANCESTOR_LABELS.get(language, {}).get(ancestor_type)
 
 
-def _get_annotator_for_language(language: str):
-    """Resolve language annotator lazily to avoid import cycles.
+# Registry mapping language keys to their annotate functions.
+# Populated on first use by _ensure_registry_populated() to avoid
+# circular imports with the language-specific annotator modules.
+_ANNOTATOR_REGISTRY: dict[str, Callable[[Node], Node]] = {}
 
-    Imports and returns the annotate function for the specified language.
-    Uses lazy importing to prevent circular dependencies between the
-    dispatcher module and language-specific annotator modules.
 
-    Args:
-        language (str): The programming language ('python', 'java', or 'cpp').
+def _ensure_registry_populated() -> None:
+    """Populate the annotator registry on first use.
 
-    Returns:
-        Callable: The annotate function for the language, or None if the
-            language is not supported.
+    Uses lazy imports to prevent circular dependencies between this dispatcher
+    module and the language-specific annotator modules.
     """
-    if language == "python":
-        from .python_annotator import annotate_python
+    if _ANNOTATOR_REGISTRY:
+        return
+    from .python_annotator import annotate_python
+    from .java_annotator import annotate_java
+    from .cpp_annotator import annotate_cpp
 
-        return annotate_python
-
-    if language == "java":
-        from .java_annotator import annotate_java
-
-        return annotate_java
-
-    if language == "cpp":
-        from .cpp_annotator import annotate_cpp
-
-        return annotate_cpp
-
-    return None
+    # Register all built-in annotators together after the lazy imports succeed.
+    _ANNOTATOR_REGISTRY.update(
+        {
+            "python": annotate_python,
+            "java": annotate_java,
+            "cpp": annotate_cpp,
+        }
+    )
 
 
 def annotate(root: Node) -> Node:
     """Annotate a node tree with semantic labels based on language.
 
     Main entry point for semantic annotation. Determines the programming
-    language from the root node type and applies the appropriate language-specific
-    semantic annotations to all nodes in the tree. Each identifier node receives
-    a semantic_label describing its declaration context (e.g., variable_name,
+    language from the root node type and dispatches to the registered
+    language-specific annotator. Each identifier node receives a
+    semantic_label describing its declaration context (e.g., variable_name,
     function_name, parameter_name).
 
     Args:
@@ -222,12 +220,11 @@ def annotate(root: Node) -> Node:
             language root (not 'module', 'program', or 'translation_unit').
     """
     language = ROOT_TO_LANGUAGE.get(root.type)
-    annotator = _get_annotator_for_language(language) if language else None
-
-    if annotator is None:
+    if language is None:
         raise ValueError(
             f"No annotator found for root node type '{root.type}'. "
             f"Supported types: {list(ROOT_TO_LANGUAGE.keys())}"
         )
 
-    return annotator(root)
+    _ensure_registry_populated()
+    return _ANNOTATOR_REGISTRY[language](root)

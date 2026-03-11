@@ -14,26 +14,27 @@ Annotation approach:
 
 from ...node import Node
 from .annotator import ROOT_TO_LANGUAGE, get_naming_ancestor_label, get_unified_type_label
+from .annotation_utils import walk
 
 
 def _annotate_node(node: Node) -> None:
-    """Recursively annotate a Java node and its children with semantic labels.
+    """Annotate a single Java node with semantic labels.
 
-    Uses post-order traversal (children before parent) to ensure scope-related
-    nodes are identified before processing their children's context. This allows
-    accurate labeling of identifiers based on their enclosing scopes and contexts.
+    Processes one node at a time; traversal is handled externally by
+    :func:`annotate_java` using :func:`~.annotation_utils.walk`.
 
     Args:
-        node (Node): The node to annotate. All children are annotated recursively.
+        node (Node): The node to annotate.
     """
-    for child in node.children:
-        _annotate_node(child)
-
     if node.type in ("whitespace", "newline"):
         return
 
-    if node.type in ("line_comment", "block_comment"):
-        node.semantic_label = "comment"
+    if node.type == "line_comment":
+        node.semantic_label = "line_comment"
+        return
+
+    if node.type == "block_comment":
+        node.semantic_label = "block_comment"
         return
 
     parent = node.parent
@@ -258,9 +259,10 @@ def _is_right_side_of_operator(node: Node, parent: Node, operator: str) -> bool:
 def annotate_java(node: Node) -> Node:
     """Annotate a Java syntax tree with semantic labels.
 
-    Main entry point for Java semantic annotation. Recursively processes
-    the entire tree, assigning semantic labels to all identifiers and
-    scope-defining nodes based on Java-specific syntax patterns.
+    Main entry point for Java semantic annotation. Processes the entire tree
+    in post-order (children before parent) using :func:`~.annotation_utils.walk`,
+    assigning semantic labels to all identifiers and scope-defining nodes
+    based on Java-specific syntax patterns.
 
     Args:
         node (Node): The root of the Java syntax tree (program node).
@@ -268,5 +270,6 @@ def annotate_java(node: Node) -> Node:
     Returns:
         Node: The same tree with semantic_label attributes set throughout.
     """
-    _annotate_node(node)
+    for n in walk(node):
+        _annotate_node(n)
     return node

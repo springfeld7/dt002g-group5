@@ -14,26 +14,29 @@ Annotation approach:
 
 from ...node import Node
 from .annotator import ROOT_TO_LANGUAGE, get_naming_ancestor_label, get_unified_type_label
+from .annotation_utils import walk
 
 
 def _annotate_node(node: Node) -> None:
-    """Recursively annotate a C++ node and its children with semantic labels.
+    """Annotate a single C++ node with semantic labels.
 
-    Uses post-order traversal (children before parent) to ensure scope-related
-    nodes are identified before processing their children's context. This allows
-    accurate labeling of identifiers based on their enclosing namespaces and scopes.
+    Processes one node at a time; traversal is handled externally by
+    :func:`annotate_cpp` using :func:`~.annotation_utils.walk`.
 
     Args:
-        node (Node): The node to annotate. All children are annotated recursively.
+        node (Node): The node to annotate.
     """
-    for child in node.children:
-        _annotate_node(child)
-
     if node.type in ("whitespace", "newline"):
         return
 
     if node.type == "comment":
-        node.semantic_label = "comment"
+        if node.text is None:
+            return
+        
+        if node.text.startswith("//"):
+            node.semantic_label = "line_comment"
+        elif node.text.startswith("//*") or node.text.endswith("*/"):
+            node.semantic_label = "block_comment"
         return
 
     parent = node.parent
@@ -241,9 +244,10 @@ def _label_for_naming_ancestor(ancestor_type: str) -> str | None:
 def annotate_cpp(node: Node) -> Node:
     """Annotate a C++ syntax tree with semantic labels.
 
-    Main entry point for C++ semantic annotation. Recursively processes
-    the entire tree, assigning semantic labels to all identifier-type nodes
-    and scope-defining nodes based on C++-specific syntax patterns.
+    Main entry point for C++ semantic annotation. Processes the entire tree
+    in post-order (children before parent) using :func:`~.annotation_utils.walk`,
+    assigning semantic labels to all identifier-type nodes and scope-defining
+    nodes based on C++-specific syntax patterns.
 
     Args:
         node (Node): The root of the C++ syntax tree (translation_unit node).
@@ -251,5 +255,6 @@ def annotate_cpp(node: Node) -> Node:
     Returns:
         Node: The same tree with semantic_label attributes set throughout.
     """
-    _annotate_node(node)
+    for n in walk(node):
+        _annotate_node(n)
     return node
