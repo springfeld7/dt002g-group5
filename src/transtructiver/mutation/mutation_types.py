@@ -49,7 +49,7 @@ class MutationAction(Enum):
 _ACTION_REQUIRED_KEYS: Dict[MutationAction, List[str]] = {
     MutationAction.REFORMAT: ["new_val"],
     MutationAction.RENAME: ["new_val"],
-    MutationAction.DELETE: ["node_type"],
+    MutationAction.DELETE: ["node_type", "content"],
     MutationAction.INSERT: ["new_val", "node_type"],
     MutationAction.SUBSTITUTE: ["node_type", "parts_map"],
     MutationAction.FLATTEN: ["node_type", "ref_map"],

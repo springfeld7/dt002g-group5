@@ -59,6 +59,18 @@ class Node:
         """
         self.children.append(child)
 
+    def remove_child(self, child: Node) -> None:
+        """
+        Remove a child node from this node.
+
+        Args:
+            child (Node): The child node to remove.
+
+        Raises:
+            ValueError: If the node is not a child of this node.
+        """
+        self.children.remove(child)
+
     def traverse(self) -> Iterator[Node]:
         """
         Yield all nodes in the tree using preorder traversal.

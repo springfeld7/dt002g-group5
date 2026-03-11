@@ -8,7 +8,7 @@ across multiple rules and nodes.
 from unittest.mock import MagicMock
 from src.transtructiver.mutation.mutation_engine import MutationEngine
 from src.transtructiver.mutation.mutation_manifest import MutationManifest
-from src.transtructiver.mutation.mutation_rule import MutationRecord
+from src.transtructiver.mutation.rules.mutation_rule import MutationRecord
 from src.transtructiver.mutation.mutation_types import MutationAction
 from src.transtructiver.node import Node
 
