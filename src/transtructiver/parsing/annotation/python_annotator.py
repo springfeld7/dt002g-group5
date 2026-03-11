@@ -32,7 +32,7 @@ def _annotate_node(node: Node) -> None:
 
     if node.type in ("whitespace", "newline"):
         return
-    
+
     if node.type == "comment":
         node.semantic_label = "comment"
         return
@@ -42,7 +42,7 @@ def _annotate_node(node: Node) -> None:
         if node.type in ROOT_TO_LANGUAGE:
             node.semantic_label = "root"
         return
-    
+
     if node.type == "string" and parent.type in ("module", "block"):
         for child in node.children:
             if child.type in {"string_start", "string_end"} and child.text in ('"""', "'''"):

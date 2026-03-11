@@ -31,7 +31,7 @@ def _annotate_node(node: Node) -> None:
 
     if node.type in ("whitespace", "newline"):
         return
-    
+
     if node.type == "comment":
         node.semantic_label = "comment"
         return
