@@ -80,21 +80,29 @@ class Node:
         for child in self.children:
             yield from child.traverse()
 
-    def clone(self) -> Node:
+    def clone(self, parent: Optional[Node] = None) -> Node:
         """
-        Creates a deep copy of the current node and all its children.
+        Creates a deep copy of this node and its entire subtree.
+
+        Args:
+            parent (Node, optional): Parent of the cloned node.
 
         Returns:
-            Node: A new instance of Node with identical type, text, and
-                recursively cloned children.
+            Node: Root of the cloned subtree.
         """
         new_node = Node(
-            self.start_point,
-            self.end_point,
-            self.type,
-            self.text,
+            start_point=self.start_point,
+            end_point=self.end_point,
+            type=self.type,
+            text=self.text,
+            children=[],
         )
-        new_node.children = [child.clone() for child in self.children]
+
+        new_node.semantic_label = self.semantic_label
+        new_node.field = self.field
+        new_node.parent = parent
+
+        new_node.children = [child.clone(new_node) for child in self.children]
 
         return new_node
 

@@ -129,6 +129,38 @@ def test_clone_deep_copy():
     assert root.children[0].text == "original"
 
 
+def test_clone_preserves_parent_relationships():
+    """
+    Verify that clone() reconstructs correct parent pointers
+    within the cloned tree rather than referencing the original nodes.
+    """
+    point = (0, 0)
+
+    # Build tree: root -> child -> grandchild
+    root = Node(point, point, "root")
+    child = Node(point, point, "child")
+    grandchild = Node(point, point, "grandchild")
+
+    root.add_child(child)
+    child.add_child(grandchild)
+
+    cloned_root = root.clone()
+
+    cloned_child = cloned_root.children[0]
+    cloned_grandchild = cloned_child.children[0]
+
+    # Root should have no parent
+    assert cloned_root.parent is None
+
+    # Parent relationships should point within the cloned tree
+    assert cloned_child.parent is cloned_root
+    assert cloned_grandchild.parent is cloned_child
+
+    # Ensure they do NOT point to original nodes
+    assert cloned_child.parent is not root
+    assert cloned_grandchild.parent is not child
+
+
 def test_node_with_multiple_children_init():
     """Verify initializing a node with a pre-defined list of children."""
     point = (0, 0)
