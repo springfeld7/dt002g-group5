@@ -20,15 +20,6 @@ from collections.abc import Callable
 from ...node import Node
 
 
-# Maps root node types (language-specific syntax tree roots) to language names.
-# This determines which language-specific annotator to use.
-ROOT_TO_LANGUAGE = {
-    "module": "python",
-    "program": "java",
-    "translation_unit": "cpp",
-}
-
-
 # Cross-language semantic labels for scope-defining node types.
 # Maps language-specific node type names to unified semantic labels that represent
 # similar constructs across Python, Java, and C++. This enables the mutation engine
@@ -176,29 +167,36 @@ def annotate(root: Node) -> Node:
     """Annotate a node tree with semantic labels based on language.
 
     Main entry point for semantic annotation. Determines the programming
-    language from the root node type and dispatches to the registered
+    language from ``root.language`` and dispatches to the registered
     language-specific annotator. Each identifier node receives a
     semantic_label describing its declaration context (e.g., variable_name,
     function_name, parameter_name).
 
     Args:
-        root (Node): The root node of the syntax tree to annotate. Should be a
-            language-specific root type (module, program, or translation_unit).
+        root (Node): The root node of the syntax tree to annotate.
+            ``root.language`` must be set (e.g., "python", "java", "cpp").
 
     Returns:
         Node: The same root node with semantic_label attributes set on all
             identifier and scope-defining nodes throughout the tree.
 
     Raises:
-        ValueError: If the root node type is not recognized as a supported
-            language root (not 'module', 'program', or 'translation_unit').
+        ValueError: If ``root.language`` is not present or unsupported.
     """
-    language = ROOT_TO_LANGUAGE.get(root.type)
-    if language is None:
+    explicit_language = getattr(root, "language", None)
+    if not explicit_language:
         raise ValueError(
-            f"No annotator found for root node type '{root.type}'. "
-            f"Supported types: {list(ROOT_TO_LANGUAGE.keys())}"
+            "No language found on root node. " "Set root.language before calling annotate()."
         )
 
+    language = explicit_language.lower()
+
     _ensure_registry_populated()
+
+    if language not in _ANNOTATOR_REGISTRY:
+        known = sorted(_ANNOTATOR_REGISTRY.keys())
+        raise ValueError(
+            f"No annotator registered for language '{language}'. " f"Available annotators: {known}"
+        )
+
     return _ANNOTATOR_REGISTRY[language](root)

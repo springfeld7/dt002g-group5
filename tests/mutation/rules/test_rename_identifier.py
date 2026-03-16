@@ -24,6 +24,11 @@ def label_nodes(root: Node) -> Node:
     """Annotate semantic labels and fields from CST structure only."""
     _wire_parents(root)
     root.semantic_label = "root"
+    if not getattr(root, "language", None):
+        if root.type == "module":
+            root.language = "python"
+        elif root.type == "program":
+            root.language = "java"
 
     # Phase 1: scope/type nodes.
     for node in root.traverse():

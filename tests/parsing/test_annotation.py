@@ -59,7 +59,9 @@ def parse_and_convert(code: str, language: str = "python") -> Node:
 
     source_bytes = bytes(code, "utf8")
     tree = parser.parse(source_bytes)
-    return convert_node(tree.root_node, source_bytes)
+    node = convert_node(tree.root_node, source_bytes)
+    node.language = language
+    return node
 
 
 class TestAnnotatorDispatcher:
@@ -71,6 +73,7 @@ class TestAnnotatorDispatcher:
         source_bytes = bytes(code, "utf8")
         tree = python_parser.parse(source_bytes)
         node = convert_node(tree.root_node, source_bytes)
+        node.language = "python"
 
         annotated = annotate(node)
 
@@ -89,6 +92,7 @@ public class Foo {
         source_bytes = bytes(code, "utf8")
         tree = java_parser.parse(source_bytes)
         node = convert_node(tree.root_node, source_bytes)
+        node.language = "java"
 
         annotated = annotate(node)
 
@@ -101,32 +105,33 @@ public class Foo {
         source_bytes = bytes(code, "utf8")
         tree = cpp_parser.parse(source_bytes)
         node = convert_node(tree.root_node, source_bytes)
+        node.language = "cpp"
 
         annotated = annotate(node)
 
         assert annotated is not None
         assert annotated.type == "translation_unit"
 
-    def test_annotate_unsupported_root_type_raises_error(self):
-        """Test annotate raises ValueError for unsupported root node types."""
+    def test_annotate_missing_language_raises_error(self):
+        """Test annotate raises ValueError when root.language is missing."""
         unsupported_node = Node(
             start_point=(0, 0),
             end_point=(0, 1),
             type="unknown_root_type",
         )
 
-        with pytest.raises(ValueError, match="No annotator found"):
+        with pytest.raises(ValueError, match="No language found on root node"):
             annotate(unsupported_node)
 
-    def test_annotate_error_message_contains_supported_types(self):
-        """Test error message lists supported node types."""
+    def test_annotate_error_message_mentions_root_language(self):
+        """Test error message tells caller to set root.language."""
         unsupported_node = Node(
             start_point=(0, 0),
             end_point=(0, 1),
             type="unknown_type",
         )
 
-        with pytest.raises(ValueError, match="module.*program.*translation_unit"):
+        with pytest.raises(ValueError, match="Set root.language"):
             annotate(unsupported_node)
 
 
@@ -217,6 +222,20 @@ class TestPythonAnnotator:
         ]
         assert len(whitespace_with_labels) == 0
 
+    def test_unresolved_identifier_falls_back_to_variable_name(self, python_parser: TSParser):
+        """Unresolved identifiers in snippet fragments should remain renamable."""
+        code = "result = ext + ext2"
+        node = parse_and_convert(code, "python")
+        annotated = annotate_python(node)
+
+        names = [
+            n.semantic_label
+            for n in annotated.traverse()
+            if n.type == "identifier" and n.text in {"ext", "ext2"}
+        ]
+        assert names
+        assert all(label == "variable_name" for label in names)
+
 
 class TestJavaAnnotator:
     """Test suite for Java semantic annotation."""
@@ -306,6 +325,20 @@ public class Foo {
         param_names = [n for n in annotated.traverse() if n.semantic_label == "parameter_name"]
         assert len(param_names) == 2
 
+    def test_unresolved_identifier_falls_back_to_variable_name(self, java_parser: TSParser):
+        """Unresolved identifiers in snippet fragments should remain renamable."""
+        code = "class A { void f(){ x = y + z; } }"
+        node = parse_and_convert(code, "java")
+        annotated = annotate_java(node)
+
+        names = [
+            n.semantic_label
+            for n in annotated.traverse()
+            if n.type == "identifier" and n.text in {"x", "y", "z"}
+        ]
+        assert names
+        assert all(label == "variable_name" for label in names)
+
 
 class TestCppAnnotator:
     """Test suite for C++ semantic annotation."""
@@ -319,6 +352,20 @@ class TestCppAnnotator:
         # Find function names
         function_names = [n for n in annotated.traverse() if n.semantic_label == "function_name"]
         assert len(function_names) == 1
+
+    def test_unresolved_identifier_falls_back_to_variable_name(self, cpp_parser: TSParser):
+        """Unresolved identifiers in snippet fragments should remain renamable."""
+        code = "int main(){ return x + y; }"
+        node = parse_and_convert(code, "cpp")
+        annotated = annotate_cpp(node)
+
+        names = [
+            n.semantic_label
+            for n in annotated.traverse()
+            if "identifier" in n.type and n.text in {"x", "y"}
+        ]
+        assert names
+        assert all(label == "variable_name" for label in names)
 
     def test_annotate_type_identifier(self, cpp_parser: TSParser):
         """Test type identifiers are labeled in C++."""
@@ -347,7 +394,7 @@ int main() {
 
         # Variable names should exist
         var_names = [n for n in annotated.traverse() if n.semantic_label == "variable_name"]
-        assert len(var_names) == 2
+        assert len(var_names) == 3
 
     def test_annotate_field_identifier(self, cpp_parser: TSParser):
         """Test field identifiers in C++."""

@@ -4,36 +4,36 @@ import json
 import pytest
 
 
-@pytest.mark.parametrize("module_name", ["transtructiver.cli", "transtructiver.prototype.cli"])
-def test_load_checkpoint_returns_zero_when_resume_disabled(tmp_path, module_name):
-    module = importlib.import_module(module_name)
+def test_load_checkpoint_returns_zero_when_resume_disabled(tmp_path):
+    """Test checkpoint returns zero when resume is disabled."""
+    module = importlib.import_module("transtructiver.cli")
     checkpoint_path = tmp_path / "checkpoint.json"
     checkpoint_path.write_text('{"next_index": 42}', encoding="utf-8")
 
     assert module._load_checkpoint(str(checkpoint_path), resume=False) == 0
 
 
-@pytest.mark.parametrize("module_name", ["transtructiver.cli", "transtructiver.prototype.cli"])
-def test_load_checkpoint_reads_next_index(tmp_path, module_name):
-    module = importlib.import_module(module_name)
+def test_load_checkpoint_reads_next_index(tmp_path):
+    """Test checkpoint reads next index when resume is enabled."""
+    module = importlib.import_module("transtructiver.cli")
     checkpoint_path = tmp_path / "checkpoint.json"
     checkpoint_path.write_text('{"next_index": 7}', encoding="utf-8")
 
     assert module._load_checkpoint(str(checkpoint_path), resume=True) == 7
 
 
-@pytest.mark.parametrize("module_name", ["transtructiver.cli", "transtructiver.prototype.cli"])
-def test_validate_rules_flags_unsupported(module_name):
-    module = importlib.import_module(module_name)
+def test_validate_rules_flags_unsupported():
+    """Test validate_rules flags unsupported rule names."""
+    module = importlib.import_module("transtructiver.cli")
 
     unsupported = module._validate_rules(["rename-identifier", "does-not-exist"])
 
     assert unsupported == ["does-not-exist"]
 
 
-@pytest.mark.parametrize("module_name", ["transtructiver.cli", "transtructiver.prototype.cli"])
-def test_run_pipeline_happy_path_writes_artifacts_and_summary(monkeypatch, tmp_path, module_name):
-    module = importlib.import_module(module_name)
+def test_run_pipeline_happy_path_writes_artifacts_and_summary(monkeypatch, tmp_path):
+    """Test run_pipeline writes artifacts and summary in happy path."""
+    module = importlib.import_module("transtructiver.cli")
 
     class DummyNode:
         def __init__(self, code):
@@ -126,7 +126,7 @@ def test_run_pipeline_happy_path_writes_artifacts_and_summary(monkeypatch, tmp_p
         filepath="dummy.parquet",
         rules=["rename-identifier"],
         output_dir=str(tmp_path),
-        rename_options=module.RenameRuleOptions(level=1, targets=["variable"]),
+        rule_params={"level": 1, "targets": ["variable"]},
         pipeline_options=options,
     )
 
@@ -147,9 +147,9 @@ def test_run_pipeline_happy_path_writes_artifacts_and_summary(monkeypatch, tmp_p
     assert save_calls[0][1] == 1
 
 
-@pytest.mark.parametrize("module_name", ["transtructiver.cli", "transtructiver.prototype.cli"])
-def test_run_pipeline_raises_for_unsupported_rule(tmp_path, module_name):
-    module = importlib.import_module(module_name)
+def test_run_pipeline_raises_for_unsupported_rule(tmp_path):
+    """Test run_pipeline raises ValueError for unsupported rule."""
+    module = importlib.import_module("transtructiver.cli")
 
     with pytest.raises(ValueError):
         module.run_pipeline(
@@ -159,9 +159,9 @@ def test_run_pipeline_raises_for_unsupported_rule(tmp_path, module_name):
         )
 
 
-@pytest.mark.parametrize("module_name", ["transtructiver.cli", "transtructiver.prototype.cli"])
-def test_run_pipeline_integration_writes_real_outputs(monkeypatch, tmp_path, module_name):
-    module = importlib.import_module(module_name)
+def test_run_pipeline_integration_writes_real_outputs(monkeypatch, tmp_path):
+    """Test run_pipeline integration writes real output files."""
+    module = importlib.import_module("transtructiver.cli")
 
     snippet = "def add(a, b):\n    return a + b\n"
     monkeypatch.setattr(module, "_iter_snippets", lambda *args, **kwargs: [(0, snippet, "python")])

@@ -35,6 +35,9 @@ class WhitespaceNormalizationRule(MutationRule):
         base_unit (int): The number of spaces per indentation level.
     """
 
+    # CLI rule name (used by the auto-discovery in cli.py).
+    rule_name = "whitespace-normalization"
+
     def __init__(self, base_unit: int = DEFAULT_BASE_UNIT):
         """
         Initializes the rule with a specific indentation base unit.
@@ -201,14 +204,7 @@ class WhitespaceNormalizationRule(MutationRule):
 
         # Only update if there is a change to avoid unnecessary mutations
         if new_text != original_text:
-            node.text = new_text
-            records.append(
-                MutationRecord(
-                    node_id=node.start_point,
-                    action=MutationAction.REFORMAT,
-                    metadata={"new_val": new_text},
-                )
-            )
+            records.append(self.record_reformat(node, new_text))
         return records
 
     def apply(self, root: Node) -> List[MutationRecord]:

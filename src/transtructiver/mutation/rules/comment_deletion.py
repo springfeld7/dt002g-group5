@@ -10,7 +10,6 @@ for comment removal, supporting downstream verification and manifest generation.
 
 from typing import List
 from .mutation_rule import MutationRule, MutationRecord
-from ..mutation_types import MutationAction
 from ...node import Node
 
 
@@ -20,6 +19,9 @@ class CommentDeletionRule(MutationRule):
 
     Each deletion generates a MutationRecord with the node's original coordinates.
     """
+
+    # CLI rule name (used by the auto-discovery in cli.py).
+    rule_name = "comment-deletion"
 
     def apply(self, root: Node) -> List[MutationRecord]:
         """
@@ -40,15 +42,7 @@ class CommentDeletionRule(MutationRule):
 
         for child in list(root.children):
             if child.semantic_label == "comment":
-                # Remove comment from tree
-                root.remove_child(child)
-
-                # Record the mutation
-                record = MutationRecord(
-                    node_id=child.start_point,
-                    action=MutationAction.DELETE,
-                    metadata={"node_type": child.type, "content": child.text},
-                )
+                record = self.record_delete(root, child)
                 records.append(record)
             else:
                 # Recursively process child nodes

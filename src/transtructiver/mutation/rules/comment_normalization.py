@@ -12,7 +12,6 @@ and content of the comment for downstream verification and manifest generation.
 
 from typing import List
 from .mutation_rule import MutationRule, MutationRecord
-from ..mutation_types import MutationAction
 from ...node import Node
 
 
@@ -27,6 +26,9 @@ class CommentNormalizationRule(MutationRule):
     Example: // Comment -> //........
     Example: /* comment */ -> /*........*/
     """
+
+    # CLI rule name (used by the auto-discovery in cli.py).
+    rule_name = "comment-normalization"
 
     FILLER = "........"
 
@@ -110,9 +112,4 @@ class CommentNormalizationRule(MutationRule):
             MutationRecord: A record of the mutation performed,
             including the node's original coordinates and content.
         """
-        node.text = new_text
-
-        record = MutationRecord(
-            node_id=node.start_point, action=MutationAction.REFORMAT, metadata={"new_val": new_text}
-        )
-        return record
+        return self.record_reformat(node, new_text)

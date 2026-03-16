@@ -13,7 +13,7 @@ Annotation approach:
 """
 
 from ...node import Node
-from .annotator import ROOT_TO_LANGUAGE, NAMING_ANCESTOR_LABELS, get_unified_type_label
+from .annotator import NAMING_ANCESTOR_LABELS, get_unified_type_label
 from .annotation_utils import walk
 
 
@@ -41,8 +41,7 @@ def _annotate_node(node: Node) -> None:
 
     parent = node.parent
     if parent is None:
-        if node.type in ROOT_TO_LANGUAGE:
-            node.semantic_label = "root"
+        node.semantic_label = "root"
         return
 
     if "identifier" in node.type:
@@ -109,7 +108,6 @@ def _annotate_identifier(node: Node) -> None:
             return
 
     if parent.type == "call_expression" and node.field == "function":
-        print(f"found call for {node.text}")
         node.semantic_label = "function_name"
         return
 
@@ -135,6 +133,10 @@ def _annotate_identifier(node: Node) -> None:
     if node.field == "argument" and parent.type == "field_expression":
         node.semantic_label = "variable_name"
         return
+
+    # Fallback for snippet fragments where declaration context is missing.
+    # Preserve explicit type identifiers as type_name for rename suffix heuristics.
+    node.semantic_label = "type_name" if node.type == "type_identifier" else "variable_name"
 
 
 def _try_label_from_naming_ancestor(node: Node) -> bool:

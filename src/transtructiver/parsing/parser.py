@@ -204,5 +204,5 @@ class Parser:
         if reason:
             return None, reason
 
-        converted_tree = adapt(root_node, source_bytes)
+        converted_tree = adapt(root_node, source_bytes, language=language)
         return converted_tree, None

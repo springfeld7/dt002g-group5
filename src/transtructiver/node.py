@@ -45,6 +45,7 @@ class Node:
         self.parent: Optional[Node] = None
         self.semantic_label: Optional[str] = None
         self.field: Optional[str] = None
+        self.language: Optional[str] = None
 
     def add_child(self, child: Node) -> None:
         """
@@ -101,6 +102,7 @@ class Node:
 
         new_node.semantic_label = self.semantic_label
         new_node.field = self.field
+        new_node.language = self.language
         new_node.parent = parent
 
         new_node.children = [child.clone(new_node) for child in self.children]

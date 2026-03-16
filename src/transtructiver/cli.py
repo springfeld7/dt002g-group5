@@ -4,27 +4,91 @@ This module provides the entry point for running the complete transformation
 pipeline on datasets, including data loading, parsing, mutation, and verification.
 
 Outputs written per run (inside ``--output-dir``):
-    * ``manifest.jsonl``       — FR-5: one JSON-Lines record per snippet
-    * ``augmented_dataset.parquet`` — FR-9: original/mutated code pairs
-    * ``summary_log.csv``      — FR-10: semantics-preservation pass/fail log
+    * ``manifest.jsonl``       — one JSON-Lines record per snippet
+    * ``augmented_dataset.parquet`` — original/mutated code pairs
+    * ``summary_log.csv``      — semantics-preservation pass/fail log
 """
 
 import argparse
+import importlib
+import inspect
 import json
 import os
+import pkgutil
+import re
 from dataclasses import dataclass
 from typing import Iterator
 import pyarrow.parquet as pq
 from .parsing.parser import Parser
+from .config import load_config, resolve_enabled_rules, get_rule_params
 from .mutation.mutation_engine import MutationEngine
-from .mutation.rules.identifier_renaming.rename_identifiers import RenameIdentifiersRule
+from .mutation.rules.mutation_rule import MutationRule
 from .node import Node
 from .reporting import summary_logger
 from .reporting.output_manager import OutputManager, RunStats
 from .verification.si_verifier import SIVerifier
 
 
-RULE_REGISTRY = {"rename-identifier": RenameIdentifiersRule}
+def _class_to_rule_name(class_name: str) -> str:
+    """Convert a CamelCase class name to a kebab-case rule name.
+
+    Args:
+        class_name (str): The class name to convert.
+
+    Returns:
+        str: The kebab-case rule name.
+
+    Examples:
+        CommentDeletionRule  → comment-deletion
+        WhitespaceNormalizationRule → whitespace-normalization
+    """
+    if class_name.endswith("Rule"):
+        class_name = class_name[:-4]
+    return re.sub(r"(?<!^)(?=[A-Z])", "-", class_name).lower()
+
+
+def _build_rule_registry() -> dict[str, type[MutationRule]]:
+    """Auto-discover all MutationRule subclasses in the mutation/rules package.
+
+    Returns:
+            dict[str, type[MutationRule]]: Registry mapping rule names to classes.
+
+    Each rule class is registered under:
+    - Its explicit ``rule_name`` class attribute (if defined), OR
+    - A name auto-derived from its class name (CamelCase → kebab-case,
+        trailing 'Rule' stripped).
+
+    New rules are picked up automatically when their module is placed anywhere
+    inside ``transtructiver/mutation/rules/``.  No manual registration needed.
+    """
+    import transtructiver.mutation.rules as rules_pkg
+
+    registry: dict[str, type[MutationRule]] = {}
+
+    for _finder, module_name, _is_pkg in pkgutil.walk_packages(
+        path=rules_pkg.__path__,
+        prefix=rules_pkg.__name__ + ".",
+        onerror=lambda _: None,
+    ):
+        try:
+            module = importlib.import_module(module_name)
+        except Exception:
+            continue
+
+        for _attr_name, cls in inspect.getmembers(module, inspect.isclass):
+            if (
+                issubclass(cls, MutationRule)
+                and cls is not MutationRule
+                and cls.__module__ == module.__name__
+            ):
+                rule_key = getattr(cls, "rule_name", None) or _class_to_rule_name(cls.__name__)
+                registry[rule_key] = cls
+
+    return registry
+
+
+RULE_REGISTRY: dict[str, type[MutationRule]] = _build_rule_registry()
+
 
 # PROTOTYPE-ONLY OUTPUT:
 # Keep developer-facing logs enabled in prototype runs.
@@ -33,11 +97,11 @@ PROTOTYPE_OUTPUT_ENABLED = True
 
 
 @dataclass
-class RenameRuleOptions:
-    """CLI options for RenameIdentifiersRule construction."""
+class VerifierOptions:
+    """Runtime options for semantic-isomorphism verification strictness."""
 
-    level: int = 0
-    targets: list[str] | None = None
+    strictness: str = "strict"
+    max_errors: int | None = None
 
 
 @dataclass
@@ -53,13 +117,22 @@ class PipelineOptions:
 
 
 def _prototype_log(message: str) -> None:
-    """PROTOTYPE-ONLY: central log sink for easy production removal."""
+    """PROTOTYPE-ONLY: central log sink for easy production removal.
+
+    Args:
+        message (str): The log message to print.
+    """
     if PROTOTYPE_OUTPUT_ENABLED:
         print(message)
 
 
 def _prototype_pretty(label: str, root: Node) -> None:
-    """PROTOTYPE-ONLY: pretty-print a CST for debugging and demos."""
+    """PROTOTYPE-ONLY: pretty-print a CST for debugging and demos.
+
+    Args:
+        label (str): Label to print before the CST.
+        root (Node): CST root node to pretty-print.
+    """
     if PROTOTYPE_OUTPUT_ENABLED:
         print(label)
         print(root.to_code())
@@ -70,7 +143,16 @@ def _iter_snippets(
     batch_size: int,
     start_index: int,
 ) -> Iterator[tuple[int, str, str]]:
-    """Stream snippets from parquet in bounded-size batches."""
+    """Stream snippets from parquet in bounded-size batches.
+
+    Args:
+        filepath (str): Path to the Parquet file.
+        batch_size (int): Number of rows per batch.
+        start_index (int): Index to start streaming from.
+
+    Returns:
+        Iterator[tuple[int, str, str]]: Yields (global_index, code, language).
+    """
     parquet_file = pq.ParquetFile(filepath)
     global_index = 0
 
@@ -85,7 +167,15 @@ def _iter_snippets(
 
 
 def _load_checkpoint(checkpoint_path: str, resume: bool) -> int:
-    """Load checkpoint and return the next index to process."""
+    """Load checkpoint and return the next index to process.
+
+    Args:
+        checkpoint_path (str): Path to checkpoint file.
+        resume (bool): Whether to resume from checkpoint.
+
+    Returns:
+        int: Next index to process.
+    """
     if not resume or not os.path.exists(checkpoint_path):
         return 0
 
@@ -95,7 +185,13 @@ def _load_checkpoint(checkpoint_path: str, resume: bool) -> int:
 
 
 def _save_checkpoint(checkpoint_path: str, next_index: int, stats: RunStats) -> None:
-    """Persist a resumable checkpoint atomically."""
+    """Persist a resumable checkpoint atomically.
+
+    Args:
+        checkpoint_path (str): Path to checkpoint file.
+        next_index (int): Next index to process.
+        stats (RunStats): Run statistics to save.
+    """
     os.makedirs(os.path.dirname(checkpoint_path), exist_ok=True)
     tmp_path = checkpoint_path + ".tmp"
     payload = {
@@ -111,24 +207,42 @@ def _save_checkpoint(checkpoint_path: str, next_index: int, stats: RunStats) -> 
 
 
 def _validate_rules(rules: list[str]) -> list[str]:
-    """Return unsupported rule names so callers can fail fast and explicitly."""
+    """Return unsupported rule names so callers can fail fast and explicitly.
+
+    Args:
+        rules (list[str]): List of rule names to validate.
+
+    Returns:
+        list[str]: List of unsupported rule names.
+    """
     return [rule for rule in rules if rule not in RULE_REGISTRY]
 
 
-def _build_engine(rules: list[str], rename_options: RenameRuleOptions) -> MutationEngine:
-    """Construct a mutation engine with per-rule configuration."""
+def _build_engine(
+    rules: list[str],
+    rule_params: dict[str, dict] | None = None,
+) -> MutationEngine:
+    """Construct a mutation engine with per-rule configuration.
+
+    Args:
+        rules (list[str]): List of rule names to apply.
+        rule_params (dict[str, dict] | None): Per-rule parameters.
+
+    Returns:
+        MutationEngine: Configured mutation engine.
+    """
+    rule_params = rule_params or {}
     configured_rules = []
     for rule_name in rules:
-        if rule_name == "rename-identifier":
-            configured_rules.append(
-                RenameIdentifiersRule(
-                    level=rename_options.level,
-                    targets=rename_options.targets,
-                )
-            )
-            continue
+        rule_cls = RULE_REGISTRY[rule_name]
+        params = dict(rule_params.get(rule_name) or {})
 
-        configured_rules.append(RULE_REGISTRY[rule_name]())
+        try:
+            configured_rules.append(rule_cls(**params) if params else rule_cls())
+        except TypeError as exc:
+            raise ValueError(
+                f"Invalid parameters for rule '{rule_name}': {params}. Error: {exc}"
+            ) from exc
 
     return MutationEngine(configured_rules)
 
@@ -137,26 +251,29 @@ def run_pipeline(
     filepath: str,
     rules: list[str],
     output_dir: str = "output",
-    rename_options: RenameRuleOptions | None = None,
+    rule_params: dict[str, dict] | None = None,
     pipeline_options: PipelineOptions | None = None,
+    verifier_options: VerifierOptions | None = None,
 ):
     """Run the complete TranStructIVer pipeline on a dataset file.
 
     For each snippet the pipeline:
-    1. Parses the original code into a CST.
-    2. Clones the CST and applies mutation rules.
-    3. Writes the transformation manifest (FR-5).
-    4. Writes the original/mutated code pair to the augmented dataset (FR-9).
-    5. Verifies semantic preservation and logs the result (FR-10).
+        1. Parses the original code into a CST.
+        2. Clones the CST and applies mutation rules.
+        3. Writes the transformation manifest.
+        4. Writes the original/mutated code pair to the augmented dataset.
+        5. Verifies semantic preservation and logs the result.
 
     Args:
         filepath (str): Path to the dataset file (Parquet format).
         rules (list[str]): Mutation rule names to apply (see RULE_REGISTRY).
         output_dir (str): Directory for all output files. Created if absent.
-        rename_options (RenameRuleOptions | None): Options for rename-identifier
-            rule configuration (level and target restrictions).
+        rule_params (dict[str, dict] | None): Parameters for rule configuration
+            (e.g., level and targets for RenameIdentifiersRule).
         pipeline_options (PipelineOptions | None): Performance options for
             streaming, sharding, compression, and checkpointing.
+        verifier_options (VerifierOptions | None): Options for auditor thresholds and
+            strictness levels for verification.
 
     Raises:
         ValueError: If any rule name is not registered in RULE_REGISTRY.
@@ -171,8 +288,7 @@ def run_pipeline(
     if unsupported_rules:
         raise ValueError(f"Arguments contain unsupported mutation rule: {unsupported_rules}")
 
-    rename_options = rename_options or RenameRuleOptions()
-    engine = _build_engine(rules, rename_options)
+    engine = _build_engine(rules, rule_params)
     verifier = SIVerifier()
     stats = RunStats()
     processed_since_checkpoint = 0
@@ -284,35 +400,25 @@ def main():
         prog="TranStructIVer", description="Run the TranStructIVer pipeline on a dataset file."
     )
     argparser.add_argument("filepath", help="Path to the dataset file")
-    argparser.add_argument("rules", nargs="*", help="Mutation rules", default=["rename-identifier"])
+    argparser.add_argument("rules", nargs="*", help="Mutation rules", default=None)
     argparser.add_argument(
-        "--output-dir", default="output", help="Directory for output files (default: output)"
-    )
-    argparser.add_argument(
-        "--rename-level",
-        type=int,
-        default=0,
-        help="RenameIdentifiersRule level (default: 0)",
-    )
-    argparser.add_argument(
-        "--rename-targets",
-        nargs="+",
-        choices=["variable", "parameter", "property", "function", "class"],
+        "--config",
         default=None,
-        help=(
-            "Restrict rename-identifier to selected target kinds. "
-            "Examples: --rename-targets variable parameter"
-        ),
+        help="Path to external YAML config file.",
+    )
+    argparser.add_argument(
+        "--output-dir", default=None, help="Directory for output files (default: output)"
     )
     argparser.add_argument(
         "--batch-size",
         type=int,
-        default=1000,
+        default=None,
         help="Parquet streaming batch size (default: 1000)",
     )
     argparser.add_argument(
         "--resume",
         action="store_true",
+        default=None,
         help="Resume processing from checkpoint if checkpoint file exists.",
     )
     argparser.add_argument(
@@ -323,41 +429,97 @@ def main():
     argparser.add_argument(
         "--checkpoint-every",
         type=int,
-        default=1000,
+        default=None,
         help="Write checkpoint every N processed snippets (default: 1000)",
     )
     argparser.add_argument(
         "--max-rows-per-shard",
         type=int,
-        default=0,
+        default=None,
         help="Shard manifest/dataset outputs every N rows (0 disables sharding).",
     )
     argparser.add_argument(
         "--compress-output",
         action="store_true",
+        default=None,
         help="Compress output files using gzip.",
+    )
+    argparser.add_argument(
+        "--rule-param",
+        action="append",
+        default=[],
+        metavar="RULE:PARAM=VALUE",
+        help="Specify a rule parameter as rule:param=value (can be repeated)",
+    )
+    argparser.add_argument(
+        "--verifier-strictness",
+        choices=["strict", "balanced", "lenient"],
+        default=None,
+        help="Verification strictness level (FR-8.2).",
+    )
+    argparser.add_argument(
+        "--verifier-max-errors",
+        type=int,
+        default=None,
+        help="Maximum tolerated verification errors before snippet fails (FR-8.2).",
     )
     args = argparser.parse_args()
 
-    rename_options = RenameRuleOptions(
-        level=args.rename_level,
-        targets=args.rename_targets,
+    config = load_config(args.config)
+
+    rules = resolve_enabled_rules(config, args.rules)
+
+    execution_cfg = config.execution
+
+    def _coalesce(cli_value, key: str, default):
+        return cli_value if cli_value is not None else execution_cfg.get(key, default)
+
+    output_dir = _coalesce(args.output_dir, "output_dir", "output")
+
+    verifier_options = VerifierOptions(
+        strictness=(args.verifier_strictness or config.verifier.strictness or "strict"),
+        max_errors=(
+            args.verifier_max_errors
+            if args.verifier_max_errors is not None
+            else config.verifier.max_errors
+        ),
     )
 
     checkpoint_path = args.checkpoint_path
     if checkpoint_path is None:
-        checkpoint_path = os.path.join(args.output_dir, "checkpoint.json")
+        checkpoint_path = os.path.join(output_dir, "checkpoint.json")
 
     pipeline_options = PipelineOptions(
-        batch_size=args.batch_size,
-        checkpoint_every=args.checkpoint_every,
+        batch_size=_coalesce(args.batch_size, "batch_size", 1000),
+        checkpoint_every=_coalesce(args.checkpoint_every, "checkpoint_every", 1000),
         checkpoint_path=checkpoint_path,
-        resume=args.resume,
-        max_rows_per_shard=args.max_rows_per_shard,
-        compress_output=args.compress_output,
+        resume=_coalesce(args.resume, "resume", False),
+        max_rows_per_shard=_coalesce(args.max_rows_per_shard, "max_rows_per_shard", 0),
+        compress_output=_coalesce(args.compress_output, "compress_output", False),
     )
 
-    run_pipeline(args.filepath, args.rules, args.output_dir, rename_options, pipeline_options)
+    # Start with config-based params
+    rule_params_map = {rule_name: get_rule_params(config, rule_name) for rule_name in rules}
+
+    # Parse --rule-param CLI overrides (rule:param=value)
+    for param in args.rule_param:
+        # Accept rule:param=value or rule:param=json_value
+        if ":" not in param or "=" not in param:
+            raise ValueError(f"Invalid --rule-param format: {param}. Use rule:param=value")
+        rule_key, rest = param.split(":", 1)
+        param_key, value = rest.split("=", 1)
+        # Try to parse value as JSON, fallback to string
+        try:
+            parsed_value = json.loads(value)
+        except Exception:
+            parsed_value = value
+        if rule_key not in rule_params_map:
+            rule_params_map[rule_key] = {}
+        rule_params_map[rule_key][param_key] = parsed_value
+
+    run_pipeline(
+        args.filepath, rules, output_dir, rule_params_map, pipeline_options, verifier_options
+    )
 
 
 if __name__ == "__main__":

@@ -14,7 +14,7 @@ Annotation approach:
 """
 
 from ...node import Node
-from .annotator import ROOT_TO_LANGUAGE, NAMING_ANCESTOR_LABELS, get_unified_type_label
+from .annotator import NAMING_ANCESTOR_LABELS, get_unified_type_label
 from .annotation_utils import walk
 
 
@@ -36,8 +36,7 @@ def _annotate_node(node: Node) -> None:
 
     parent = node.parent
     if parent is None:
-        if node.type in ROOT_TO_LANGUAGE:
-            node.semantic_label = "root"
+        node.semantic_label = "root"
         return
 
     if node.type == "string" and parent.type in ("module", "block"):
@@ -105,6 +104,11 @@ def _annotate_identifier(node: Node) -> None:
 
     if parent.type == "attribute":
         _annotate_attribute_identifier(node, parent)
+        return
+
+    # Fallback for snippet fragments where declaration context is missing.
+    # This keeps unresolved identifiers eligible for scoped renaming.
+    node.semantic_label = "variable_name"
 
 
 def _annotate_attribute_identifier(node: Node, parent: Node) -> None:

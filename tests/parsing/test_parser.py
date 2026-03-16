@@ -391,18 +391,6 @@ def outer():
         assert tree is not None
         assert reason is None
 
-    def test_parse_javascript_function(self, parser):
-        """Test parsing JavaScript code."""
-        code = """
-function add(a, b) {
-    const result = a + b;
-    return result;
-}
-"""
-        tree, reason = parser.parse(code, "javascript")
-        assert tree is not None
-        assert reason is None
-
     def test_parse_java_class(self, parser):
         """Test parsing Java code."""
         code = """

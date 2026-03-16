@@ -31,10 +31,12 @@ class RunStats:
 
     @property
     def processed(self) -> int:
+        """Return the number of snippets that reached verification."""
         return self.verified_ok + self.verified_fail
 
     @property
     def success_rate(self) -> float:
+        """Return the fraction of verified snippets that passed SI checks."""
         if self.processed == 0:
             return 0.0
         return self.verified_ok / self.processed
@@ -69,6 +71,13 @@ class OutputManager:
         max_rows_per_shard: int,
         compress_output: bool,
     ):
+        """Configure output paths, shard settings, and lazily opened handles.
+
+        Args:
+            output_dir (str): Directory for output files.
+            max_rows_per_shard (int): Shard size for outputs.
+            compress_output (bool): Whether to gzip-compress text outputs.
+        """
         self.output_dir = output_dir
         self.max_rows_per_shard = max_rows_per_shard
         self.compress_output = compress_output
@@ -81,7 +90,11 @@ class OutputManager:
         self.summary_path = os.path.join(output_dir, f"summary_log{summary_suffix}")
 
     def __enter__(self):
-        """Initialize output directory and summary writer for the run."""
+        """Initialize output directory and summary writer for the run.
+
+        Returns:
+            OutputManager: The initialized manager instance.
+        """
         os.makedirs(self.output_dir, exist_ok=True)
         self.summary_handle = open_text_append(self.summary_path, self.compress_output)
         self.summary_writer = csv.writer(self.summary_handle)
@@ -97,17 +110,38 @@ class OutputManager:
             self.summary_handle.close()
 
     def _suffix(self, base_ext: str) -> str:
-        """Return extension suffix adjusted for optional gzip text outputs."""
+        """Return extension suffix adjusted for optional gzip text outputs.
+
+        Args:
+            base_ext (str): Base file extension.
+
+        Returns:
+            str: Extension with optional .gz suffix.
+        """
         return f"{base_ext}.gz" if self.compress_output else base_ext
 
     def _manifest_path(self, shard_id: int) -> str:
-        """Build manifest output path for a shard or single-file mode."""
+        """Build manifest output path for a shard or single-file mode.
+
+        Args:
+            shard_id (int): Shard index.
+
+        Returns:
+            str: Manifest file path.
+        """
         if self.max_rows_per_shard <= 0:
             return os.path.join(self.output_dir, f"manifest{self._suffix('.jsonl')}")
         return os.path.join(self.output_dir, f"manifest-{shard_id:06d}{self._suffix('.jsonl')}")
 
     def _dataset_parquet_path(self, shard_id: int) -> str:
-        """Build parquet dataset output path for a shard or single-file mode."""
+        """Build parquet dataset output path for a shard or single-file mode.
+
+        Args:
+            shard_id (int): Shard index.
+
+        Returns:
+            str: Parquet file path.
+        """
         if self.max_rows_per_shard <= 0:
             return os.path.join(self.output_dir, "augmented_dataset.parquet")
         return os.path.join(self.output_dir, f"augmented_dataset-{shard_id:06d}.parquet")
@@ -155,7 +189,13 @@ class OutputManager:
     def write_manifest(
         self, snippet_index: int, snippet_id: str, entries: list[dict[str, Any]]
     ) -> None:
-        """Append one manifest record for a snippet to the current shard."""
+        """Append one manifest record for a snippet to the current shard.
+
+        Args:
+            snippet_index (int): Index of the snippet.
+            snippet_id (str): Unique snippet identifier.
+            entries (list[dict[str, Any]]): Manifest entries for the snippet.
+        """
         self._ensure_shard(snippet_index)
         record = {"snippet_id": snippet_id, "entries": entries}
         if self.manifest_handle is None:
@@ -169,7 +209,14 @@ class OutputManager:
         original_code: str,
         mutated_code: str,
     ) -> None:
-        """Append one original/mutated code pair row to parquet output."""
+        """Append one original/mutated code pair row to parquet output.
+
+        Args:
+            snippet_index (int): Index of the snippet.
+            snippet_id (str): Unique snippet identifier.
+            original_code (str): Original code string.
+            mutated_code (str): Mutated code string.
+        """
         self._ensure_shard(snippet_index)
         if self.dataset_parquet_writer is None:
             raise RuntimeError("Parquet dataset writer is not initialized.")
@@ -183,7 +230,11 @@ class OutputManager:
         self.dataset_parquet_writer.write_table(table)
 
     def output_paths_summary(self) -> tuple[str, str, str]:
-        """Return human-readable paths/patterns for produced artifacts."""
+        """Return human-readable paths/patterns for produced artifacts.
+
+        Returns:
+            tuple[str, str, str]: Manifest, dataset, and summary file paths.
+        """
         manifest_name = "manifest-*.jsonl" if self.max_rows_per_shard > 0 else "manifest.jsonl"
         dataset_name = (
             "augmented_dataset-*.parquet"

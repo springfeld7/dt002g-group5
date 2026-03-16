@@ -4,15 +4,9 @@ import json
 import pytest
 
 
-@pytest.mark.parametrize(
-    "module_name",
-    [
-        "transtructiver.reporting.output_manager",
-        "transtructiver.prototype.reporting.output_manager",
-    ],
-)
-def test_runstats_success_rate(module_name):
-    module = importlib.import_module(module_name)
+def test_runstats_success_rate():
+    """Test RunStats processed and success_rate properties."""
+    module = importlib.import_module("transtructiver.reporting.output_manager")
 
     stats = module.RunStats(parsed_ok=3, parse_skipped=1, verified_ok=2, verified_fail=2)
 
@@ -20,15 +14,9 @@ def test_runstats_success_rate(module_name):
     assert stats.success_rate == 0.5
 
 
-@pytest.mark.parametrize(
-    "module_name",
-    [
-        "transtructiver.reporting.output_manager",
-        "transtructiver.prototype.reporting.output_manager",
-    ],
-)
-def test_output_paths_summary_single_file(module_name, tmp_path):
-    module = importlib.import_module(module_name)
+def test_output_paths_summary_single_file(tmp_path):
+    """Test output_paths_summary returns correct file names for single file mode."""
+    module = importlib.import_module("transtructiver.reporting.output_manager")
 
     manager = module.OutputManager(str(tmp_path), max_rows_per_shard=0, compress_output=False)
     manifest_path, dataset_path, summary_path = manager.output_paths_summary()
@@ -38,15 +26,9 @@ def test_output_paths_summary_single_file(module_name, tmp_path):
     assert summary_path.endswith("summary_log.csv")
 
 
-@pytest.mark.parametrize(
-    "module_name",
-    [
-        "transtructiver.reporting.output_manager",
-        "transtructiver.prototype.reporting.output_manager",
-    ],
-)
-def test_output_manager_writes_manifest_and_dataset(module_name, tmp_path):
-    module = importlib.import_module(module_name)
+def test_output_manager_writes_manifest_and_dataset(tmp_path):
+    """Test OutputManager writes manifest and dataset files correctly."""
+    module = importlib.import_module("transtructiver.reporting.output_manager")
 
     with module.OutputManager(
         str(tmp_path), max_rows_per_shard=0, compress_output=False

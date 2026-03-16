@@ -30,9 +30,22 @@ class SIVerifier:
             found during verification. This list is reset at the start of each verify() call.
     """
 
-    def __init__(self):
+    _STRICTNESS_DEFAULTS = {
+        "strict": 0,
+        "balanced": 3,
+        "lenient": 10,
+    }
+
+    def __init__(self, strictness: str = "strict", max_errors: int | None = None):
         self.strategies = STRATEGY_MAP
         self.errors: List[str] = []
+        self.strictness = strictness.lower()
+        if self.strictness not in self._STRICTNESS_DEFAULTS:
+            raise ValueError(
+                f"Unknown strictness '{strictness}'. "
+                f"Expected one of: {list(self._STRICTNESS_DEFAULTS.keys())}"
+            )
+        self.max_errors = max_errors
 
     def _report(self, msg: str) -> None:
         """Logs a discrepancy."""
@@ -61,9 +74,28 @@ class SIVerifier:
         self._halt = False  # Reset circuit breaker
 
         if manifest.has_structural_changes():
-            return self._verify_synchronized(original_tree, mutated_tree, manifest)
+            ok = self._verify_synchronized(original_tree, mutated_tree, manifest)
+        else:
+            ok = self._verify_aligned(original_tree, mutated_tree, manifest)
 
-        return self._verify_aligned(original_tree, mutated_tree, manifest)
+        if ok:
+            return True
+
+        threshold = self._effective_error_threshold()
+        if len(self.errors) <= threshold:
+            return True
+        return False
+
+    def _effective_error_threshold(self) -> int:
+        """Resolve effective verification error threshold.
+
+        Priority:
+        1) explicit max_errors
+        2) strictness default (strict=0, balanced=3, lenient=10)
+        """
+        if self.max_errors is not None:
+            return max(0, self.max_errors)
+        return self._STRICTNESS_DEFAULTS[self.strictness]
 
     def _verify_aligned(self, orig: Node, mut: Node, manifest: MutationManifest) -> bool:
         """
