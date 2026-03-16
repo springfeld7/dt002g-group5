@@ -116,6 +116,25 @@ class MutationRule(ABC):
             metadata={"new_val": new_text},
         )
 
+    def record_insert(
+        self, point: tuple[int, int], new_text: str, new_type: str
+    ) -> "MutationRecord":
+        """Insert *node* into *parent* and return an INSERT record.
+
+        Args:
+            point: The insert point of the node.
+            new_text: The text of the inserted node.
+            new_type: The type of the inserted node.
+
+        Returns:
+            A MutationRecord ready to append to your records list.
+        """
+        return MutationRecord(
+            node_id=point,
+            action=MutationAction.INSERT,
+            metadata={"new_val": new_text, "node_type": new_type},
+        )
+
     def record_delete(self, parent: Node, node: Node) -> "MutationRecord":
         """Remove *node* from *parent* and return a DELETE record.
 
