@@ -122,3 +122,24 @@ class MutationManifest:
                 added to the manifest; False otherwise.
         """
         return self._has_structural_changes
+
+    def to_dict(self) -> List[Dict[str, Any]]:
+        """
+        Serialize all manifest entries into a plain-Python list of dicts
+        suitable for JSON output.
+
+        Returns:
+            List[Dict[str, Any]]: One dict per recorded node transformation.
+        """
+        result = []
+        for node_id, entry in self._entries.items():
+            result.append(
+                {
+                    "node_id": list(node_id),
+                    "history": [
+                        {"rule": h["rule"], "action": str(h["action"])} for h in entry.history
+                    ],
+                    "metadata": entry.metadata,
+                }
+            )
+        return result

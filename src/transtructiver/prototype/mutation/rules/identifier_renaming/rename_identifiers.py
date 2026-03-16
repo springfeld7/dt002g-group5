@@ -51,7 +51,6 @@ class RenameIdentifiersRule(MutationRule):
 
     # Node field names treated as declarations rather than references.
     _DECLARATION_FIELDS = {
-        "left",
         "name",
         "declarator",
         "parameter",
@@ -95,12 +94,15 @@ class RenameIdentifiersRule(MutationRule):
 
     def _is_declaration_identifier(self, node: Node) -> bool:
         """Return whether the identifier creates or updates scope bindings."""
+        if node.parent and "assignment" in node.parent.type:
+            if node.field == "left":
+                return True
         return node.field in self._DECLARATION_FIELDS
 
     def _is_renamable_identifier(self, node: Node) -> bool:
         """Return whether the identifier is eligible for renaming."""
         return (
-            node.type == "identifier"
+            "identifier" in node.type
             and bool(node.text)
             and node.semantic_label in self.allowed_labels
         )
@@ -226,6 +228,29 @@ class RenameIdentifiersRule(MutationRule):
             if self._is_scope_node(node):
                 self._scope.enter_scope()
                 stack.append((node, True))
+
+            # If a binding is already known for this identifier in the current
+            # scope stack, rename it regardless of semantic label coverage.
+            # This keeps declaration/reference renames consistent even when
+            # # a reference node was not annotated as variable_name/parameter_name.
+            if (
+                "identifier" in node.type
+                and node.text
+                and not self._is_declaration_identifier(node)
+            ):
+                existing = self._scope.resolve(node.text)
+                if existing is not None and existing != node.text:
+                    node.text = existing
+                    records.append(
+                        MutationRecord(
+                            node.start_point,
+                            MutationAction.RENAME,
+                            {"new_val": existing},
+                        )
+                    )
+                    for child in reversed(node.children):
+                        stack.append((child, False))
+                    continue
 
             if not self._is_renamable_identifier(node) or not node.text:
                 for child in reversed(node.children):

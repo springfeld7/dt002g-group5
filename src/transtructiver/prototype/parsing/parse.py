@@ -25,69 +25,25 @@ def main():
     test_cases = [
         (
             "Python",
-            '''def check_grammar(text: str = ""):
-    """
-    Checks grammar and spelling in the given text using LanguageTool.
-    Returns a list of issues found.
-    """
-    if not isinstance(text, str) or not text.strip():
-        raise ValueError("Input must be a non-empty string.")
-
-    # Create a grammar checking tool (default: English)
-    tool = language_tool_python.LanguageTool('en-US')
-
-    # Find matches (grammar/spelling issues)
-    matches = tool.check(text)
-
-    return matches
-
-def suggest_corrections(text = None):
-    """
-    Prints grammar issues and suggested corrections.
-    """
-    matches = check_grammar(text)
-
-    if not matches:
-        print("✅ No grammar issues found.")
-        return
-
-    print(f"Found {len(matches)} issue(s):\\n")
-    for match in matches:
-        print(f"🔹 Issue: {match.message}")
-        print(f"   Error in: '{text[match.offset:match.offset + match.errorLength]}'")
-        if match.replacements:
-            print(f"   Suggestion(s): {', '.join(match.replacements)}")
-        print()
-''',
+            """def add(a, b):
+	return a + b
+""",
             "python",
         ),
         (
             "Java",
-            """
-public class SimpleGrammarParser {
-
-    private final String input;
-    private int pos = 0;
-    private List<String> arrayList = new ArrayList<>();
-
-    public SimpleGrammarParser(String input) {
-        this.input = input.replaceAll("\\s+", ""); // Remove spaces
-        this.arrayList = List::new;
-    }
+            """add(a, b) {
+    return a + b;
+}
 """,
             "java",
         ),
         (
             "C++",
-            """class MyClass {
-public:
-    int myField;
-};
-
-int main() {
-    MyClass obj;
-    obj.myField = 5;
-}""",
+            """add(a, b) {
+    return a + b;
+}
+""",
             "cpp",
         ),
     ]
@@ -108,29 +64,35 @@ int main() {
         print("Parsed CST:")
         cst.pretty()
 
-        # print("\n\n=== SEMANTIC ANNOTATIONS ===\n")
+        print("\n\n=== SEMANTIC ANNOTATIONS ===\n")
 
-        # annotated_nodes = []
+        annotated_nodes = []
 
-        # for node in cst.traverse():
-        #     if hasattr(node, 'semantic_label') and node.semantic_label is not None:
-        #         annotated_nodes.append(node)
+        for node in cst.traverse():
+            if hasattr(node, "semantic_label") and node.semantic_label is not None:
+                annotated_nodes.append(node)
 
-        # if annotated_nodes:
-        #     print(f"Found {len(annotated_nodes)} annotated nodes:\n")
-        #     for node in annotated_nodes:
-        #         parent_type = node.parent.type if node.parent else "None"
-        #         print(f"  [{node.semantic_label}] '{node.text}' (type: {node.type}, parent: {parent_type})")
-        # else:
-        #     print("No semantic annotations found.")
+        if annotated_nodes:
+            print(f"Found {len(annotated_nodes)} annotated nodes:\n")
+            for node in annotated_nodes:
+                parent_type = node.parent.type if node.parent else "None"
+                print(
+                    f"  [{node.semantic_label}] '{node.text}' (type: {node.type}, parent: {parent_type})"
+                )
+        else:
+            print("No semantic annotations found.")
 
-        # print("\n=== ALL IDENTIFIERS ===\n")
-        # identifiers = [node for node in cst.traverse() if node.type == "identifier"]
-        # print(f"Found {len(identifiers)} identifiers:\n")
-        # for node in identifiers[:20]:  # Limit to first 20
-        #     parent_type = node.parent.type if node.parent else "None"
-        #     label = f"[{node.semantic_label}]" if hasattr(node, 'semantic_label') and node.semantic_label else "[unlabeled]"
-        #     print(f"  {label} '{node.text}' (parent: {parent_type})")
+        print("\n=== ALL IDENTIFIERS ===\n")
+        identifiers = [node for node in cst.traverse() if node.type == "identifier"]
+        print(f"Found {len(identifiers)} identifiers:\n")
+        for node in identifiers[:20]:  # Limit to first 20
+            parent_type = node.parent.type if node.parent else "None"
+            label = (
+                f"[{node.semantic_label}]"
+                if hasattr(node, "semantic_label") and node.semantic_label
+                else "[unlabeled]"
+            )
+            print(f"  {label} '{node.text}' (parent: {parent_type})")
 
     else:
         print(f"Invalid snippet, reason to discard: {discard_reason}")

@@ -13,7 +13,7 @@ Annotation approach:
 """
 
 from ...node import Node
-from .annotator import ROOT_TO_LANGUAGE, get_naming_ancestor_label, get_unified_type_label
+from .annotator import ROOT_TO_LANGUAGE, NAMING_ANCESTOR_LABELS, get_unified_type_label
 from .annotation_utils import walk
 
 
@@ -109,6 +109,7 @@ def _annotate_identifier(node: Node) -> None:
             return
 
     if parent.type == "call_expression" and node.field == "function":
+        print(f"found call for {node.text}")
         node.semantic_label = "function_name"
         return
 
@@ -117,43 +118,23 @@ def _annotate_identifier(node: Node) -> None:
         node.semantic_label = "class_name"
         return
 
-    # Declaration names and declarators: use ancestor context
-    if node.field in ("name", "declarator") or parent.field == "declarator":
-        if _try_label_from_naming_ancestor(node):
-            return
-        # Qualified identifier names fall back to variable reference
-        if parent.type == "qualified_identifier":
-            node.semantic_label = "variable_name"
-            return
+    # Declaration names and declarators
+    if parent.type == "declaration":
+        node.semantic_label = "type_name" if node.type == "type_identifier" else "variable_name"
+        return
+
+    if _try_label_from_naming_ancestor(node):
+        return
+
+    # Qualified identifier names fall back to variable reference
+    if parent.type == "qualified_identifier":
+        node.semantic_label = "variable_name"
+        return
 
     # Field expression argument (the object being accessed)
     if node.field == "argument" and parent.type == "field_expression":
         node.semantic_label = "variable_name"
         return
-
-    # Variable references in expressions (only for identifiers not yet labeled)
-    if node.type == "identifier" and node.semantic_label is None:
-        if parent.type in (
-            "binary_expression",
-            "update_expression",
-            "unary_expression",
-            "assignment_expression",
-            "subscript_expression",
-            "argument_list",
-            "return_statement",
-            "condition_clause",
-            "for_range_loop",
-            "init_statement",
-            "expression_statement",
-            "compound_statement",
-            "delete_expression",
-        ):
-            node.semantic_label = "variable_name"
-            return
-
-    # Fallback: generic type identifiers that are not declaration names
-    if node.type == "type_identifier" and node.semantic_label is None:
-        node.semantic_label = "type_name"
 
 
 def _try_label_from_naming_ancestor(node: Node) -> bool:
@@ -172,6 +153,17 @@ def _try_label_from_naming_ancestor(node: Node) -> bool:
     """
     naming_ancestor = _find_nearest_naming_ancestor(node)
     if naming_ancestor is not None:
+        if naming_ancestor.type == "parameter_declaration":
+            ancestor = _find_nearest_naming_ancestor(naming_ancestor)
+            if ancestor and ancestor.type == "function_declarator":
+                if ancestor.parent and node.type == "type_identifier":
+                    sibling = any(c.type == "identifier" for c in naming_ancestor.children)
+                    node.semantic_label = (
+                        "type_name"
+                        if (sibling or ancestor.parent.type != "function_definition")
+                        else "parameter_name"
+                    )
+                    return True
         label = _label_for_naming_ancestor(naming_ancestor.type)
         if label is not None:
             node.semantic_label = label
@@ -200,28 +192,34 @@ def _find_nearest_naming_ancestor(node: Node) -> Node | None:
         Node | None: The nearest naming ancestor, or None if no relevant
             context is found.
     """
-    naming_context_types = {
-        "function_declarator",
-        "function_definition",
-        "parameter_declaration",
-        "init_declarator",
-        "class_specifier",
-        "struct_specifier",
-        "enum_specifier",
-        "enumerator",
-        "namespace_definition",
-        "type_alias_declaration",
-        "field_declaration",
-        "preproc_def",
-    }
-
     current = node.parent
     while current is not None:
-        if current.type in naming_context_types:
+        if current.type in NAMING_ANCESTOR_LABELS["cpp"]:
             return current
+        if _is_naming_boundary(current):
+            return None
         current = current.parent
 
     return None
+
+
+def _is_naming_boundary(node: Node) -> bool:
+    """Return True when traversing further would leave declaration context.
+
+    Identifies nodes that represent boundaries beyond which declaration
+    context is lost. Prevents incorrect labeling of identifiers in nested
+    contexts like function bodies or nested expressions.
+
+    Args:
+        node (Node): The node to check.
+
+    Returns:
+        bool: True if the node marks a boundary, False otherwise.
+    """
+    if node.type in {"translation_unit", "compound_statement"}:
+        return True
+
+    return node.type.endswith("_statement") or node.type.endswith("_expression")
 
 
 def _label_for_naming_ancestor(ancestor_type: str) -> str | None:
@@ -238,7 +236,7 @@ def _label_for_naming_ancestor(ancestor_type: str) -> str | None:
             function_name, class_name, namespace_name, type_name, etc.),
             or None if not recognized.
     """
-    return get_naming_ancestor_label("cpp", ancestor_type)
+    return NAMING_ANCESTOR_LABELS["cpp"].get(ancestor_type)
 
 
 def annotate_cpp(node: Node) -> Node:

@@ -31,6 +31,7 @@ class MutationEngine:
             rules (List[MutationRule]): List of mutation rule objects.
         """
         self.rules: List[MutationRule] = rules
+        self.manifest: MutationManifest = MutationManifest()
 
     def apply_mutations(self, cst: Node) -> MutationManifest:
         """
@@ -38,7 +39,8 @@ class MutationEngine:
 
         Rules are applied sequentially. This method populates the transformation Manifest
         by aggregating mutation records from each rule, which serves as the
-        source of truth for downstream verification.
+        source of truth for downstream verification. The result is also stored
+        as ``self.manifest`` for post-hoc inspection by the caller.
 
         Args:
             cst (Node): The root node of the CST to mutate.
@@ -51,6 +53,7 @@ class MutationEngine:
             local_changes = rule.apply(cst)
             self._merge_to_manifest(manifest, local_changes, rule.name)
 
+        self.manifest = manifest
         return manifest
 
     def _merge_to_manifest(

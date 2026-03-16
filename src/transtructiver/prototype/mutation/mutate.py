@@ -7,7 +7,7 @@ Usage:
     python -m prototype.mutation.mutate
 """
 
-from ..mock.mock_cst import cst
+from ..parsing.parser import Parser
 from .rules.identifier_renaming.rename_identifiers import RenameIdentifiersRule
 from .mutation_engine import MutationEngine
 
@@ -22,14 +22,23 @@ def main():
     4. Applies the mutation rules to transform the tree
     5. Prints the mutated tree structure
     """
-    print("Before mutation:")
-    cst.pretty()
+    lang = "cpp"
+    code = """add(a, b) {
+    return a + b;
+}
+"""
+    parser = Parser()
+    cst, discard_reason = parser.parse(code, lang)
 
-    engine = MutationEngine([RenameIdentifiersRule()])
-    engine.apply_mutations(cst)
+    if cst:
+        print("Before mutation:")
+        cst.pretty()
 
-    print("\nAfter mutation:")
-    cst.pretty()
+        engine = MutationEngine([RenameIdentifiersRule()])
+        engine.apply_mutations(cst)
+
+        print("\nAfter mutation:")
+        cst.pretty()
 
 
 if __name__ == "__main__":
