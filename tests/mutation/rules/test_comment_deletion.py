@@ -5,6 +5,8 @@ comment nodes from a CST, generates MutationRecords for each deletion,
 and preserves non-comment nodes.
 """
 
+from random import random
+
 import pytest
 from src.transtructiver.mutation.rules.comment_deletion import CommentDeletionRule
 from src.transtructiver.mutation.rules.mutation_rule import MutationRecord
@@ -57,8 +59,8 @@ def make_tree_without_comments():
 
 def label_comments(root: Node) -> Node:
     """
-    Traverse the tree and set semantic_label='comment' for all nodes
-    whose type is 'comment'.
+    Traverse the tree and set semantic_label for all nodes whose type is 'comment'.
+    Randomly assigns 50% 'line_comment' and 50% 'block_comment'.
 
     Args:
         root (Node): Root of the CST.
@@ -68,13 +70,22 @@ def label_comments(root: Node) -> Node:
     """
     for node in root.traverse():
         if node.type == "comment":
-            node.semantic_label = "comment"
+            node.semantic_label = "line_comment" if random() < 0.5 else "block_comment"
     return root
 
 
 def collect_node_types(root: Node):
     """Return a list of all node types in the tree (preorder traversal)."""
     return [node.type for node in root.traverse()]
+
+
+def collect_comment_labels(root: Node):
+    """Return a list of all semantic_labels of comment nodes in the tree."""
+    return [
+        node.semantic_label
+        for node in root.traverse()
+        if getattr(node, "semantic_label", None) in ["line_comment", "block_comment"]
+    ]
 
 
 # ===== Fixtures =====
@@ -108,10 +119,10 @@ def no_comments_tree():
 
 
 def test_comment_nodes_removed(sample_tree, comment_rule):
-    """Verify that all comment nodes are removed from the CST."""
+    """Verify that all comment nodes are removed based on semantic_label."""
     _ = comment_rule.apply(sample_tree)
 
-    assert "comment" not in collect_node_types(sample_tree)
+    assert collect_comment_labels(sample_tree) == []
 
 
 def test_non_comment_nodes_preserved(sample_tree, comment_rule):
@@ -132,15 +143,36 @@ def test_mutation_records_for_comments(sample_tree, comment_rule):
     for rec in records:
         assert isinstance(rec, MutationRecord)
         assert rec.action == MutationAction.DELETE
+        # the rule still reports original node type as 'comment'
         assert rec.metadata["node_type"] == "comment"
         assert rec.metadata["content"].startswith("//")
 
 
 def test_nested_comments_deleted(sample_tree, comment_rule):
-    """Verify that comments nested inside blocks are removed."""
+    """Verify that nested comments are removed based on semantic_label."""
     _ = comment_rule.apply(sample_tree)
 
-    assert all(n.type != "comment" for n in sample_tree.traverse())
+    assert all(
+        getattr(n, "semantic_label", None) not in ["line_comment", "block_comment"]
+        for n in sample_tree.traverse()
+    )
+
+
+def test_deleted_content_matches_node(sample_tree, comment_rule):
+    """Verify that the content in MutationRecords matches the deleted comment nodes."""
+    root = sample_tree
+    # collect original comment texts before deletion
+    original_comments = [
+        n.text
+        for n in root.traverse()
+        if getattr(n, "semantic_label", None) in ["line_comment", "block_comment"]
+    ]
+    records = comment_rule.apply(root)
+    record_contents = [rec.metadata["content"] for rec in records]
+
+    # All original comment texts should appear in the MutationRecords
+    for text in original_comments:
+        assert text in record_contents
 
 
 # ===== Edge Cases =====
