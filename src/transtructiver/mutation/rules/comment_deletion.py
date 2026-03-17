@@ -41,7 +41,7 @@ class CommentDeletionRule(MutationRule):
         records: List[MutationRecord] = []
 
         for child in list(root.children):
-            if child.semantic_label == "comment":
+            if child.semantic_label in ["line_comment", "block_comment"]:
                 record = self.record_delete(root, child)
                 records.append(record)
             else:
