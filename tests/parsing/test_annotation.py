@@ -11,12 +11,25 @@ from tree_sitter_language_pack import get_language
 
 from src.transtructiver.node import Node
 from src.transtructiver.parsing.adapter import convert_node
+
 from src.transtructiver.parsing.annotation import (
     annotate,
     annotate_python,
     annotate_java,
     annotate_cpp,
 )
+from src.transtructiver.parsing.annotation.builtin_checker import make_profile_from_files
+import os
+
+
+def _profile(language):
+    """Import language profile containing builtin names"""
+    base_dir = os.path.abspath(
+        os.path.join(
+            os.path.dirname(__file__), "../../src/transtructiver/parsing/annotation/profiles"
+        )
+    )
+    return make_profile_from_files(language, base_dir)
 
 
 @pytest.fixture
@@ -142,7 +155,7 @@ class TestPythonAnnotator:
         """Test function names are annotated correctly."""
         code = "def my_function(): pass"
         node = parse_and_convert(code, "python")
-        annotated = annotate_python(node)
+        annotated = annotate_python(node, _profile("python"))
 
         # Find function_definition node
         func_defs = [n for n in annotated.traverse() if n.type == "function_definition"]
@@ -157,7 +170,7 @@ class TestPythonAnnotator:
         """Test variable names in assignments are annotated."""
         code = "my_var = 123"
         node = parse_and_convert(code, "python")
-        annotated = annotate_python(node)
+        annotated = annotate_python(node, _profile("python"))
 
         # Find identifiers with variable_name label
         var_names = [n for n in annotated.traverse() if n.semantic_label == "variable_name"]
@@ -167,7 +180,7 @@ class TestPythonAnnotator:
         """Test class names are annotated correctly."""
         code = "class MyClass: pass"
         node = parse_and_convert(code, "python")
-        annotated = annotate_python(node)
+        annotated = annotate_python(node, _profile("python"))
 
         # Find class names
         class_names = [n for n in annotated.traverse() if n.semantic_label == "class_name"]
@@ -177,7 +190,7 @@ class TestPythonAnnotator:
         """Test parameter names are annotated."""
         code = "def func(param1, param2): pass"
         node = parse_and_convert(code, "python")
-        annotated = annotate_python(node)
+        annotated = annotate_python(node, _profile("python"))
 
         # Find parameter names
         param_names = [n for n in annotated.traverse() if n.semantic_label == "parameter_name"]
@@ -187,7 +200,7 @@ class TestPythonAnnotator:
         """Test global variable declarations are annotated."""
         code = "def func():\n    global x\n    x = 5"
         node = parse_and_convert(code, "python")
-        annotated = annotate_python(node)
+        annotated = annotate_python(node, _profile("python"))
 
         # Find identifiers in global statement
         global_vars = [
@@ -202,7 +215,7 @@ class TestPythonAnnotator:
         """Test type annotations are recognized."""
         code = "x: int = 5"
         node = parse_and_convert(code, "python")
-        annotated = annotate_python(node)
+        annotated = annotate_python(node, _profile("python"))
 
         # Type identifiers should have type_name label
         type_names = [n for n in annotated.traverse() if n.semantic_label == "type_name"]
@@ -212,7 +225,7 @@ class TestPythonAnnotator:
         """Test that whitespace and newline nodes are skipped during annotation."""
         code = "x = 1"
         node = parse_and_convert(code, "python")
-        annotated = annotate_python(node)
+        annotated = annotate_python(node, _profile("python"))
 
         # Whitespace and newline nodes should not have semantic labels
         whitespace_with_labels = [
@@ -226,7 +239,7 @@ class TestPythonAnnotator:
         """Unresolved identifiers in snippet fragments should remain renamable."""
         code = "result = ext + ext2"
         node = parse_and_convert(code, "python")
-        annotated = annotate_python(node)
+        annotated = annotate_python(node, _profile("python"))
 
         names = [
             n.semantic_label
@@ -235,6 +248,16 @@ class TestPythonAnnotator:
         ]
         assert names
         assert all(label == "variable_name" for label in names)
+
+    def test_annotate_exception_name(self, python_parser: TSParser):
+        """Test exception names in raise statements are labeled as exception_name."""
+        code = "raise Exception('error')"
+        node = parse_and_convert(code, "python")
+        annotated = annotate_python(node, _profile("python"))
+
+        exception_names = [n for n in annotated.traverse() if n.semantic_label == "exception_name"]
+        assert len(exception_names) == 1
+        assert exception_names[0].text == "Exception"
 
 
 class TestJavaAnnotator:
@@ -248,7 +271,7 @@ public class Foo {
 }
 """
         node = parse_and_convert(code, "java")
-        annotated = annotate_java(node)
+        annotated = annotate_java(node, _profile("java"))
 
         # Find method names
         function_names = [n for n in annotated.traverse() if n.semantic_label == "function_name"]
@@ -258,7 +281,7 @@ public class Foo {
         """Test class names are annotated in Java."""
         code = "public class MyClass { }"
         node = parse_and_convert(code, "java")
-        annotated = annotate_java(node)
+        annotated = annotate_java(node, _profile("java"))
 
         # Find class names
         class_names = [n for n in annotated.traverse() if n.semantic_label == "class_name"]
@@ -273,7 +296,7 @@ public class Foo {
 }
 """
         node = parse_and_convert(code, "java")
-        annotated = annotate_java(node)
+        annotated = annotate_java(node, _profile("java"))
 
         # Type identifiers should be labeled
         type_names = [n for n in annotated.traverse() if n.semantic_label == "type_name"]
@@ -289,7 +312,7 @@ public class Foo {
 }
 """
         node = parse_and_convert(code, "java")
-        annotated = annotate_java(node)
+        annotated = annotate_java(node, _profile("java"))
 
         # Field/property access
         var_names = [n for n in annotated.traverse() if n.semantic_label == "property_name"]
@@ -305,7 +328,7 @@ public class Foo {
 }
 """
         node = parse_and_convert(code, "java")
-        annotated = annotate_java(node)
+        annotated = annotate_java(node, _profile("java"))
 
         # Method calls should create function names
         function_names = [n for n in annotated.traverse() if n.semantic_label == "function_name"]
@@ -319,7 +342,7 @@ public class Foo {
 }
 """
         node = parse_and_convert(code, "java")
-        annotated = annotate_java(node)
+        annotated = annotate_java(node, _profile("java"))
 
         # Parameters should be labeled
         param_names = [n for n in annotated.traverse() if n.semantic_label == "parameter_name"]
@@ -329,7 +352,7 @@ public class Foo {
         """Unresolved identifiers in snippet fragments should remain renamable."""
         code = "class A { void f(){ x = y + z; } }"
         node = parse_and_convert(code, "java")
-        annotated = annotate_java(node)
+        annotated = annotate_java(node, _profile("java"))
 
         names = [
             n.semantic_label
@@ -339,6 +362,22 @@ public class Foo {
         assert names
         assert all(label == "variable_name" for label in names)
 
+    def test_annotate_exception_name(self, java_parser: TSParser):
+        """Test exception names in throw statements are labeled as exception_name."""
+        code = """
+        public class Foo {
+            public void bar() {
+                throw new Exception("fail");
+            }
+        }
+        """
+        node = parse_and_convert(code, "java")
+        annotated = annotate_java(node, _profile("java"))
+
+        exception_names = [n for n in annotated.traverse() if n.semantic_label == "exception_name"]
+        assert len(exception_names) == 1
+        assert exception_names[0].text == "Exception"
+
 
 class TestCppAnnotator:
     """Test suite for C++ semantic annotation."""
@@ -347,7 +386,7 @@ class TestCppAnnotator:
         """Test function names are annotated in C++."""
         code = "int myFunction() { return 0; }"
         node = parse_and_convert(code, "cpp")
-        annotated = annotate_cpp(node)
+        annotated = annotate_cpp(node, _profile("cpp"))
 
         # Find function names
         function_names = [n for n in annotated.traverse() if n.semantic_label == "function_name"]
@@ -357,7 +396,7 @@ class TestCppAnnotator:
         """Unresolved identifiers in snippet fragments should remain renamable."""
         code = "int main(){ return x + y; }"
         node = parse_and_convert(code, "cpp")
-        annotated = annotate_cpp(node)
+        annotated = annotate_cpp(node, _profile("cpp"))
 
         names = [
             n.semantic_label
@@ -380,7 +419,7 @@ int main() {
 }
 """
         node = parse_and_convert(code, "cpp")
-        annotated = annotate_cpp(node)
+        annotated = annotate_cpp(node, _profile("cpp"))
 
         # Type identifiers (custom types like struct/class)
         type_names = [n for n in annotated.traverse() if n.semantic_label == "type_name"]
@@ -390,7 +429,7 @@ int main() {
         """Test variable references in expressions."""
         code = "int main() { int x = 5; int y = x + 1; return 0; }"
         node = parse_and_convert(code, "cpp")
-        annotated = annotate_cpp(node)
+        annotated = annotate_cpp(node, _profile("cpp"))
 
         # Variable names should exist
         var_names = [n for n in annotated.traverse() if n.semantic_label == "variable_name"]
@@ -410,7 +449,7 @@ int main() {
 }
 """
         node = parse_and_convert(code, "cpp")
-        annotated = annotate_cpp(node)
+        annotated = annotate_cpp(node, _profile("cpp"))
 
         # Field/property access
         property_names = [n for n in annotated.traverse() if n.semantic_label == "property_name"]
@@ -420,7 +459,7 @@ int main() {
         """Test namespace identifiers are labeled."""
         code = "namespace myNamespace { }"
         node = parse_and_convert(code, "cpp")
-        annotated = annotate_cpp(node)
+        annotated = annotate_cpp(node, _profile("cpp"))
 
         # Namespace names
         namespace_names = [n for n in annotated.traverse() if n.semantic_label == "namespace_name"]
@@ -435,11 +474,23 @@ public:
 };
 """
         node = parse_and_convert(code, "cpp")
-        annotated = annotate_cpp(node)
+        annotated = annotate_cpp(node, _profile("cpp"))
 
         # Class names
         class_names = [n for n in annotated.traverse() if n.semantic_label == "class_name"]
         assert len(class_names) == 2
+
+    def test_annotate_exception_name(self, cpp_parser: TSParser):
+        """Test exception names in throw statements are labeled as exception_name."""
+        code = "void foo() { throw std::exception(); }"
+        node = parse_and_convert(code, "cpp")
+        annotated = annotate_cpp(node, _profile("cpp"))
+
+        annotated.pretty()
+
+        exception_names = [n for n in annotated.traverse() if n.semantic_label == "exception_name"]
+        assert len(exception_names) == 1
+        assert "exception" in exception_names[0].text  # type: ignore
 
 
 class TestAnnotationEdgeCases:
@@ -449,7 +500,7 @@ class TestAnnotationEdgeCases:
         """Test annotating empty Python module."""
         code = ""
         node = parse_and_convert(code, "python")
-        annotated = annotate_python(node)
+        annotated = annotate_python(node, _profile("python"))
 
         assert annotated is not None
         assert annotated.type == "module"
@@ -461,7 +512,7 @@ class TestAnnotationEdgeCases:
 x = 5  # Inline comment
 """
         node = parse_and_convert(code, "python")
-        annotated = annotate_python(node)
+        annotated = annotate_python(node, _profile("python"))
 
         assert annotated is not None
         # Should not raise errors
@@ -472,7 +523,7 @@ x = 5  # Inline comment
         node = parse_and_convert(code, "python")
         child_count_before = len(list(node.traverse()))
 
-        annotated = annotate_python(node)
+        annotated = annotate_python(node, _profile("python"))
         child_count_after = len(list(annotated.traverse()))
 
         assert child_count_before == child_count_after
@@ -481,7 +532,7 @@ x = 5  # Inline comment
         """Test that parent links remain valid after annotation."""
         code = "class A:\n    def method(self): pass"
         node = parse_and_convert(code, "python")
-        annotated = annotate_python(node)
+        annotated = annotate_python(node, _profile("python"))
 
         for child in annotated.traverse():
             if child.parent is not None:
@@ -492,8 +543,8 @@ x = 5  # Inline comment
         code = "x = 42"
         node = parse_and_convert(code, "python")
 
-        annotated1 = annotate_python(node)
-        annotated2 = annotate_python(annotated1)
+        annotated1 = annotate_python(node, _profile("python"))
+        annotated2 = annotate_python(annotated1, _profile("python"))
 
         # Should have same structure
         labels1 = [n.semantic_label for n in annotated1.traverse()]
@@ -508,7 +559,7 @@ class TestUnifiedScopeLabels:
         """Python function_definition should map to unified function_scope label."""
         code = "def foo(x): return x"
         node = parse_and_convert(code, "python")
-        annotated = annotate_python(node)
+        annotated = annotate_python(node, _profile("python"))
 
         func_defs = [n for n in annotated.traverse() if n.type == "function_definition"]
         assert len(func_defs) == 1
@@ -522,7 +573,7 @@ public class Foo {
 }
 """
         node = parse_and_convert(code, "java")
-        annotated = annotate_java(node)
+        annotated = annotate_java(node, _profile("java"))
 
         method_nodes = [n for n in annotated.traverse() if n.type == "method_declaration"]
         assert len(method_nodes) == 1
@@ -532,7 +583,7 @@ public class Foo {
         """C++ function_definition should map to unified function_scope label."""
         code = "int foo() { return 1; }"
         node = parse_and_convert(code, "cpp")
-        annotated = annotate_cpp(node)
+        annotated = annotate_cpp(node, _profile("cpp"))
 
         func_defs = [n for n in annotated.traverse() if n.type == "function_definition"]
         assert len(func_defs) == 1

@@ -1,0 +1,114 @@
+{
+    "java": [
+        "lang",
+        "util",
+        "io",
+        "nio",
+        "time",
+        "math",
+        "net",
+        "sql"
+    ],
+    "lang": [
+      "Object",
+      "String",
+      "Class",
+      "System",
+      "Math",
+      "Integer",
+      "Long",
+      "Double",
+      "Float",
+      "Boolean",
+      "Character",
+      "Short",
+      "Byte",
+      "Void",
+      "StringBuilder",
+      "StringBuffer",
+      "Thread",
+      "Runnable",
+      "Comparable",
+      "Iterable",
+      "Number"
+    ],
+    "util": [
+      "List",
+      "ArrayList",
+      "LinkedList",
+      "Map",
+      "HashMap",
+      "TreeMap",
+      "LinkedHashMap",
+      "Set",
+      "HashSet",
+      "LinkedHashSet",
+      "Queue",
+      "Deque",
+      "ArrayDeque",
+      "PriorityQueue",
+      "Collections",
+      "Arrays",
+      "Optional",
+      "Stream",
+      "Collectors",
+      "Iterator",
+      "Comparator"
+    ],
+    "io": [
+      "InputStream",
+      "OutputStream",
+      "File",
+      "FileInputStream",
+      "FileOutputStream",
+      "BufferedReader",
+      "BufferedWriter",
+      "PrintWriter",
+      "Reader",
+      "Writer"
+    ],
+    "nio": [
+        "file"
+    ],
+    "file": [
+      "Path",
+      "Paths",
+      "Files",
+      "StandardOpenOption"
+    ],
+    "time": [
+      "LocalDate",
+      "LocalTime",
+      "LocalDateTime",
+      "Duration",
+      "Instant",
+      "ZoneId",
+      "ZonedDateTime",
+      "Period"
+    ],
+    "math": [
+      "BigInteger",
+      "BigDecimal"
+    ],
+    "net": [
+      "Socket",
+      "ServerSocket",
+      "URL",
+      "URLConnection",
+      "HttpURLConnection"
+    ],
+    "sql": [
+      "Connection",
+      "DriverManager",
+      "Statement",
+      "PreparedStatement",
+      "ResultSet",
+      "SQLException"
+    ],
+    "javax": [
+      "Servlet",
+      "ServletRequest",
+      "ServletResponse",
+      "Persistence" 
+    ]
+}

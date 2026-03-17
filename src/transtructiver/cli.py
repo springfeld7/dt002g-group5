@@ -17,8 +17,7 @@ import os
 import pkgutil
 import re
 from dataclasses import dataclass
-from typing import Iterator
-import pyarrow.parquet as pq
+from .data_loading.data_loader import DataLoader
 from .parsing.parser import Parser
 from .config import load_config, resolve_enabled_rules, get_rule_params
 from .mutation.mutation_engine import MutationEngine
@@ -27,6 +26,10 @@ from .node import Node
 from .reporting import summary_logger
 from .reporting.output_manager import OutputManager, RunStats
 from .verification.si_verifier import SIVerifier
+
+####################################################################
+# Rule registry and discovery
+####################################################################
 
 
 def _class_to_rule_name(class_name: str) -> str:
@@ -90,6 +93,10 @@ def _build_rule_registry() -> dict[str, type[MutationRule]]:
 RULE_REGISTRY: dict[str, type[MutationRule]] = _build_rule_registry()
 
 
+####################################################################
+# Dataclasses and prototype helpers
+####################################################################
+
 # PROTOTYPE-ONLY OUTPUT:
 # Keep developer-facing logs enabled in prototype runs.
 # For production hardening, set this to False (or remove related helpers/calls).
@@ -138,72 +145,9 @@ def _prototype_pretty(label: str, root: Node) -> None:
         print(root.to_code())
 
 
-def _iter_snippets(
-    filepath: str,
-    batch_size: int,
-    start_index: int,
-) -> Iterator[tuple[int, str, str]]:
-    """Stream snippets from parquet in bounded-size batches.
-
-    Args:
-        filepath (str): Path to the Parquet file.
-        batch_size (int): Number of rows per batch.
-        start_index (int): Index to start streaming from.
-
-    Returns:
-        Iterator[tuple[int, str, str]]: Yields (global_index, code, language).
-    """
-    parquet_file = pq.ParquetFile(filepath)
-    global_index = 0
-
-    for batch in parquet_file.iter_batches(batch_size=batch_size, columns=["code", "language"]):
-        batch_dict = batch.to_pydict()
-        codes = batch_dict.get("code", [])
-        languages = batch_dict.get("language", [])
-        for code, language in zip(codes, languages):
-            if global_index >= start_index:
-                yield global_index, code, language
-            global_index += 1
-
-
-def _load_checkpoint(checkpoint_path: str, resume: bool) -> int:
-    """Load checkpoint and return the next index to process.
-
-    Args:
-        checkpoint_path (str): Path to checkpoint file.
-        resume (bool): Whether to resume from checkpoint.
-
-    Returns:
-        int: Next index to process.
-    """
-    if not resume or not os.path.exists(checkpoint_path):
-        return 0
-
-    with open(checkpoint_path, "r", encoding="utf-8") as f:
-        payload = json.load(f)
-    return int(payload.get("next_index", 0))
-
-
-def _save_checkpoint(checkpoint_path: str, next_index: int, stats: RunStats) -> None:
-    """Persist a resumable checkpoint atomically.
-
-    Args:
-        checkpoint_path (str): Path to checkpoint file.
-        next_index (int): Next index to process.
-        stats (RunStats): Run statistics to save.
-    """
-    os.makedirs(os.path.dirname(checkpoint_path), exist_ok=True)
-    tmp_path = checkpoint_path + ".tmp"
-    payload = {
-        "next_index": next_index,
-        "parsed_ok": stats.parsed_ok,
-        "parse_skipped": stats.parse_skipped,
-        "verified_ok": stats.verified_ok,
-        "verified_fail": stats.verified_fail,
-    }
-    with open(tmp_path, "w", encoding="utf-8") as f:
-        json.dump(payload, f)
-    os.replace(tmp_path, checkpoint_path)
+####################################################################
+# Rule validation and engine construction
+####################################################################
 
 
 def _validate_rules(rules: list[str]) -> list[str]:
@@ -247,6 +191,11 @@ def _build_engine(
     return MutationEngine(configured_rules)
 
 
+####################################################################
+# Pipeline execution
+####################################################################
+
+
 def run_pipeline(
     filepath: str,
     rules: list[str],
@@ -280,7 +229,9 @@ def run_pipeline(
     """
     os.makedirs(output_dir, exist_ok=True)
     pipeline_options = pipeline_options or PipelineOptions()
-    start_index = _load_checkpoint(pipeline_options.checkpoint_path, pipeline_options.resume)
+    # Use DataLoader abstraction; implementation is chosen internally.
+    loader = DataLoader(filepath, checkpoint_path=pipeline_options.checkpoint_path)
+    start_index = loader.load_checkpoint(pipeline_options.resume)
 
     parser = Parser()
 
@@ -298,8 +249,7 @@ def run_pipeline(
         max_rows_per_shard=pipeline_options.max_rows_per_shard,
         compress_output=pipeline_options.compress_output,
     ) as outputs:
-        for idx, code, language in _iter_snippets(
-            filepath,
+        for idx, code, language in loader.iter_snippets(
             batch_size=pipeline_options.batch_size,
             start_index=start_index,
         ):
@@ -315,7 +265,7 @@ def run_pipeline(
                     pipeline_options.checkpoint_every > 0
                     and processed_since_checkpoint >= pipeline_options.checkpoint_every
                 ):
-                    _save_checkpoint(pipeline_options.checkpoint_path, idx + 1, stats)
+                    loader.save_checkpoint(idx + 1, stats)
                     processed_since_checkpoint = 0
                 continue
 
@@ -357,11 +307,11 @@ def run_pipeline(
                 pipeline_options.checkpoint_every > 0
                 and processed_since_checkpoint >= pipeline_options.checkpoint_every
             ):
-                _save_checkpoint(pipeline_options.checkpoint_path, idx + 1, stats)
+                loader.save_checkpoint(idx + 1, stats)
                 processed_since_checkpoint = 0
 
         if processed_since_checkpoint > 0:
-            _save_checkpoint(pipeline_options.checkpoint_path, idx + 1, stats)
+            loader.save_checkpoint(idx + 1, stats)
 
         summary_logger.write_summary_totals(
             parsed_ok=stats.parsed_ok,
@@ -382,6 +332,11 @@ def run_pipeline(
         f"parse_skipped={stats.parse_skipped}, "
         f"success_rate={stats.success_rate:.2%}"
     )
+
+
+####################################################################
+# CLI argument parsing and main entry
+####################################################################
 
 
 def main():

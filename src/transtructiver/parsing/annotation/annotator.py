@@ -76,6 +76,7 @@ NAMING_ANCESTOR_LABELS = {
         "function_definition": "function_name",
         "class_definition": "class_name",
         "type": "type_name",
+        "raise_statement": "exception_name",
     },
     "java": {
         **dict.fromkeys(
@@ -95,6 +96,7 @@ NAMING_ANCESTOR_LABELS = {
             ],
             "class_name",
         ),
+        "throw_statement": "exception_name",
     },
     "cpp": {
         **dict.fromkeys(["function_declarator", "function_definition"], "function_name"),
@@ -105,6 +107,7 @@ NAMING_ANCESTOR_LABELS = {
         "parameter_declaration": "parameter_name",
         "namespace_definition": "namespace_name",
         "type_alias_declaration": "type_name",
+        "throw_statement": "exception_name",
     },
 }
 
@@ -136,31 +139,17 @@ def get_unified_type_label(node_type: str) -> str | None:
 
 
 # Registry mapping language keys to their annotate functions.
-# Populated on first use by _ensure_registry_populated() to avoid
-# circular imports with the language-specific annotator modules.
-_ANNOTATOR_REGISTRY: dict[str, Callable[[Node], Node]] = {}
+_ANNOTATOR_REGISTRY: dict[str, Callable[[Node, dict[str, str]], Node]] = {}
 
 
-def _ensure_registry_populated() -> None:
-    """Populate the annotator registry on first use.
+def register_annotator(language: str, func: Callable[[Node, dict[str, str]], Node]) -> None:
+    """Register a language annotator function.
 
-    Uses lazy imports to prevent circular dependencies between this dispatcher
-    module and the language-specific annotator modules.
+    Args:
+        language (str): Language key (e.g., 'python', 'java', 'cpp').
+        func (Callable[[Node], Node]): Annotator function for the language.
     """
-    if _ANNOTATOR_REGISTRY:
-        return
-    from .python_annotator import annotate_python
-    from .java_annotator import annotate_java
-    from .cpp_annotator import annotate_cpp
-
-    # Register all built-in annotators together after the lazy imports succeed.
-    _ANNOTATOR_REGISTRY.update(
-        {
-            "python": annotate_python,
-            "java": annotate_java,
-            "cpp": annotate_cpp,
-        }
-    )
+    _ANNOTATOR_REGISTRY[language.lower()] = func
 
 
 def annotate(root: Node) -> Node:
@@ -175,6 +164,7 @@ def annotate(root: Node) -> Node:
     Args:
         root (Node): The root node of the syntax tree to annotate.
             ``root.language`` must be set (e.g., "python", "java", "cpp").
+        profile (object): The language profile (e.g., LanguageProfile) for builtin/type checking.
 
     Returns:
         Node: The same root node with semantic_label attributes set on all
@@ -186,17 +176,22 @@ def annotate(root: Node) -> Node:
     explicit_language = getattr(root, "language", None)
     if not explicit_language:
         raise ValueError(
-            "No language found on root node. " "Set root.language before calling annotate()."
+            "No language found on root node. Set root.language before calling annotate()."
         )
 
     language = explicit_language.lower()
 
-    _ensure_registry_populated()
-
     if language not in _ANNOTATOR_REGISTRY:
         known = sorted(_ANNOTATOR_REGISTRY.keys())
         raise ValueError(
-            f"No annotator registered for language '{language}'. " f"Available annotators: {known}"
+            f"No annotator registered for language '{language}'. Available annotators: {known}"
         )
 
-    return _ANNOTATOR_REGISTRY[language](root)
+    # Load the correct LanguageProfile for the language
+    from .builtin_checker import make_profile_from_files
+    import os
+
+    base_dir = os.path.join(os.path.dirname(__file__), "profiles")
+    profile = make_profile_from_files(language, base_dir)
+
+    return _ANNOTATOR_REGISTRY[language](root, profile)

@@ -14,11 +14,12 @@ Annotation approach:
 """
 
 from ...node import Node
-from .annotator import NAMING_ANCESTOR_LABELS, get_unified_type_label
+from .annotator import NAMING_ANCESTOR_LABELS, get_unified_type_label, register_annotator
 from .annotation_utils import walk
+from .builtin_checker import is_builtin
 
 
-def _annotate_node(node: Node) -> None:
+def _annotate_node(node: Node, profile: dict[str, str]) -> None:
     """Annotate a single Python node with semantic labels.
 
     Processes one node at a time; traversal is handled externally by
@@ -45,10 +46,16 @@ def _annotate_node(node: Node) -> None:
                 node.semantic_label = "block_comment"
         return
 
-    if node.type == "identifier":
+    # Annotate identifier that is not in import statement
+    if node.type == "identifier" and not parent.type == "dotted_name":
         _annotate_identifier(node)
 
     _annotate_scope_types(node)
+
+    # Edit annotation of node from standard library
+    if node.text and is_builtin(node.text, profile):
+        if node.semantic_label != "type_name":
+            node.semantic_label = "builtin_name"
 
 
 def _annotate_scope_types(node: Node) -> None:
@@ -87,6 +94,9 @@ def _annotate_identifier(node: Node) -> None:
         return
 
     if node.field == "function":
+        if parent.parent and parent.parent.type == "raise_statement":
+            node.semantic_label = "exception_name"
+            return
         node.semantic_label = "function_name"
         return
 
@@ -202,7 +212,7 @@ def _label_for_naming_ancestor(node: Node, naming_ancestor: Node) -> str | None:
     return NAMING_ANCESTOR_LABELS["python"].get(naming_ancestor.type)
 
 
-def annotate_python(node: Node) -> Node:
+def annotate_python(node: Node, profile: dict[str, str]) -> Node:
     """Annotate a Python syntax tree with semantic labels.
 
     Main entry point for Python semantic annotation. Processes the entire
@@ -212,10 +222,15 @@ def annotate_python(node: Node) -> Node:
 
     Args:
         node (Node): The root of the Python syntax tree (module node).
+        profile: The language profile for builtin/type checking.
 
     Returns:
-        Node: The same tree with semantic_label attributes set throughout.
+        Node: The same tree with semantic_label and is_builtin attributes set throughout.
     """
     for n in walk(node):
-        _annotate_node(n)
+        _annotate_node(n, profile)
     return node
+
+
+# Register this annotator
+register_annotator("python", annotate_python)

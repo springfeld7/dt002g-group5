@@ -4,24 +4,6 @@ import json
 import pytest
 
 
-def test_load_checkpoint_returns_zero_when_resume_disabled(tmp_path):
-    """Test checkpoint returns zero when resume is disabled."""
-    module = importlib.import_module("transtructiver.cli")
-    checkpoint_path = tmp_path / "checkpoint.json"
-    checkpoint_path.write_text('{"next_index": 42}', encoding="utf-8")
-
-    assert module._load_checkpoint(str(checkpoint_path), resume=False) == 0
-
-
-def test_load_checkpoint_reads_next_index(tmp_path):
-    """Test checkpoint reads next index when resume is enabled."""
-    module = importlib.import_module("transtructiver.cli")
-    checkpoint_path = tmp_path / "checkpoint.json"
-    checkpoint_path.write_text('{"next_index": 7}', encoding="utf-8")
-
-    assert module._load_checkpoint(str(checkpoint_path), resume=True) == 7
-
-
 def test_validate_rules_flags_unsupported():
     """Test validate_rules flags unsupported rule names."""
     module = importlib.import_module("transtructiver.cli")
@@ -34,6 +16,19 @@ def test_validate_rules_flags_unsupported():
 def test_run_pipeline_happy_path_writes_artifacts_and_summary(monkeypatch, tmp_path):
     """Test run_pipeline writes artifacts and summary in happy path."""
     module = importlib.import_module("transtructiver.cli")
+
+    class DummyLoader:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def load_checkpoint(self, resume):
+            return 0
+
+        def save_checkpoint(self, next_index, stats):
+            save_calls.append((next_index, stats.parsed_ok, stats.verified_ok, stats.verified_fail))
+
+        def iter_snippets(self, batch_size, start_index):
+            return [(0, "print(1)", "python")]
 
     class DummyNode:
         def __init__(self, code):
@@ -101,23 +96,15 @@ def test_run_pipeline_happy_path_writes_artifacts_and_summary(monkeypatch, tmp_p
     def fake_write_summary_totals(**kwargs):
         totals_calls.append(kwargs)
 
-    def fake_save_checkpoint(path, next_index, stats):
-        save_calls.append(
-            (path, next_index, stats.parsed_ok, stats.verified_ok, stats.verified_fail)
-        )
-
     monkeypatch.setattr(module, "Parser", FakeParser)
-    monkeypatch.setattr(
-        module, "_iter_snippets", lambda *args, **kwargs: [(0, "print(1)", "python")]
-    )
     monkeypatch.setattr(module, "_build_engine", lambda *args, **kwargs: FakeEngine())
     monkeypatch.setattr(module, "SIVerifier", FakeVerifier)
     monkeypatch.setattr(module, "OutputManager", FakeOutputManager)
-    monkeypatch.setattr(module, "_save_checkpoint", fake_save_checkpoint)
     monkeypatch.setattr(module.summary_logger, "write_summary", fake_write_summary)
     monkeypatch.setattr(module.summary_logger, "write_summary_totals", fake_write_summary_totals)
     monkeypatch.setattr(module, "_prototype_log", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(module, "_prototype_pretty", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(module, "DataLoader", lambda *args, **kwargs: DummyLoader())
 
     checkpoint_path = tmp_path / "checkpoint.json"
     options = module.PipelineOptions(checkpoint_path=str(checkpoint_path), checkpoint_every=1000)
@@ -163,10 +150,26 @@ def test_run_pipeline_integration_writes_real_outputs(monkeypatch, tmp_path):
     """Test run_pipeline integration writes real output files."""
     module = importlib.import_module("transtructiver.cli")
 
+    class DummyLoader:
+        def __init__(self, *args, **kwargs):
+            self.checkpoint_path = str(checkpoint_path)
+
+        def load_checkpoint(self, resume):
+            return 0
+
+        def save_checkpoint(self, next_index, stats):
+            # Actually write a checkpoint file so the test can check for it
+            payload = {"next_index": next_index}
+            with open(self.checkpoint_path, "w", encoding="utf-8") as f:
+                json.dump(payload, f)
+
+        def iter_snippets(self, batch_size, start_index):
+            return [(0, snippet, "python")]
+
     snippet = "def add(a, b):\n    return a + b\n"
-    monkeypatch.setattr(module, "_iter_snippets", lambda *args, **kwargs: [(0, snippet, "python")])
     monkeypatch.setattr(module, "_prototype_log", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(module, "_prototype_pretty", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(module, "DataLoader", lambda *args, **kwargs: DummyLoader())
 
     output_dir = tmp_path / "out"
     checkpoint_path = tmp_path / "checkpoint.json"

@@ -12,12 +12,14 @@ Annotation approach:
 - Special handling for destructor names, method references, and qualified identifiers
 """
 
+from .builtin_checker import is_builtin
+
 from ...node import Node
-from .annotator import NAMING_ANCESTOR_LABELS, get_unified_type_label
+from .annotator import NAMING_ANCESTOR_LABELS, get_unified_type_label, register_annotator
 from .annotation_utils import walk
 
 
-def _annotate_node(node: Node) -> None:
+def _annotate_node(node: Node, profile: dict[str, str]) -> None:
     """Annotate a single C++ node with semantic labels.
 
     Processes one node at a time; traversal is handled externally by
@@ -44,10 +46,16 @@ def _annotate_node(node: Node) -> None:
         node.semantic_label = "root"
         return
 
-    if "identifier" in node.type:
+    # Annotate identifier that is not in import statement
+    if "identifier" in node.type and not parent.type == "preproc_include":
         _annotate_identifier(node)
 
     _annotate_scope_types(node)
+
+    # Edit annotation of node from standard library
+    if node.text and is_builtin(node.text, profile):
+        if node.semantic_label != "type_name":
+            node.semantic_label = "builtin_name"
 
 
 def _annotate_scope_types(node: Node) -> None:
@@ -108,6 +116,11 @@ def _annotate_identifier(node: Node) -> None:
             return
 
     if parent.type == "call_expression" and node.field == "function":
+        if parent.parent and parent.parent.type == "throw_statement":
+            for child in node.children:
+                if child.type == "identifier":
+                    child.semantic_label = "exception_name"
+                    return
         node.semantic_label = "function_name"
         return
 
@@ -122,11 +135,6 @@ def _annotate_identifier(node: Node) -> None:
         return
 
     if _try_label_from_naming_ancestor(node):
-        return
-
-    # Qualified identifier names fall back to variable reference
-    if parent.type == "qualified_identifier":
-        node.semantic_label = "variable_name"
         return
 
     # Field expression argument (the object being accessed)
@@ -241,7 +249,7 @@ def _label_for_naming_ancestor(ancestor_type: str) -> str | None:
     return NAMING_ANCESTOR_LABELS["cpp"].get(ancestor_type)
 
 
-def annotate_cpp(node: Node) -> Node:
+def annotate_cpp(node: Node, profile: dict[str, str]) -> Node:
     """Annotate a C++ syntax tree with semantic labels.
 
     Main entry point for C++ semantic annotation. Processes the entire tree
@@ -251,10 +259,15 @@ def annotate_cpp(node: Node) -> Node:
 
     Args:
         node (Node): The root of the C++ syntax tree (translation_unit node).
+        profile: The language profile for builtin/type checking.
 
     Returns:
-        Node: The same tree with semantic_label attributes set throughout.
+        Node: The same tree with semantic_label and is_builtin attributes set throughout.
     """
     for n in walk(node):
-        _annotate_node(n)
+        _annotate_node(n, profile)
     return node
+
+
+# Register this annotator
+register_annotator("cpp", annotate_cpp)

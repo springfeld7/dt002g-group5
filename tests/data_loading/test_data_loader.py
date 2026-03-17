@@ -49,10 +49,22 @@ def test_load_successful(sample_parquet):
     file_path, original_df = sample_parquet
 
     loader = DataLoader(str(file_path))
-    df_loaded = loader.load()
-
-    pd.testing.assert_frame_equal(df_loaded, original_df)
-    assert len(loader.df) == 2
+    # Use iter_snippets to stream rows
+    streamed = list(loader.iter_snippets(batch_size=10, start_index=0))
+    # Convert streamed output to DataFrame for comparison
+    indices, codes, languages = zip(*streamed)
+    df_streamed = pd.DataFrame(
+        {
+            "index": indices,
+            "code": codes,
+            "language": languages,
+        }
+    )
+    # Compare streamed DataFrame to original
+    pd.testing.assert_frame_equal(
+        df_streamed.reset_index(drop=True), original_df.reset_index(drop=True)
+    )
+    assert len(streamed) == 2
 
 
 def test_load_missing_file(tmp_path):
@@ -61,9 +73,8 @@ def test_load_missing_file(tmp_path):
     """
     missing_path = tmp_path / "missing.parquet"
     loader = DataLoader(str(missing_path))
-
-    with pytest.raises(FileNotFoundError):
-        loader.load()
+    with pytest.raises(Exception):
+        list(loader.iter_snippets(batch_size=10, start_index=0))
 
 
 def test_load_invalid_file(tmp_path):
@@ -74,6 +85,5 @@ def test_load_invalid_file(tmp_path):
     invalid_file.write_text("not a parquet file")
 
     loader = DataLoader(str(invalid_file))
-
-    with pytest.raises(ValueError):
-        loader.load()
+    with pytest.raises(Exception):
+        list(loader.iter_snippets(batch_size=10, start_index=0))

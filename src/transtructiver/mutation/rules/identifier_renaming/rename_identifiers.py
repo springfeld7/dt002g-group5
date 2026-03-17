@@ -229,10 +229,16 @@ class RenameIdentifiersRule(MutationRule):
                 self._scope.enter_scope()
                 stack.append((node, True))
 
+            # Skip renaming for builtins
+            if node.semantic_label == "builtin":
+                for child in reversed(node.children):
+                    stack.append((child, False))
+                continue
+
             # If a binding is already known for this identifier in the current
             # scope stack, rename it regardless of semantic label coverage.
             # This keeps declaration/reference renames consistent even when
-            # # a reference node was not annotated as variable_name/parameter_name.
+            # a reference node was not annotated as variable_name/parameter_name.
             if (
                 "identifier" in node.type
                 and node.text

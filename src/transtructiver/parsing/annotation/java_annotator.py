@@ -12,12 +12,14 @@ Annotation approach:
 - Handles method references, field access, and method invocations with operator analysis
 """
 
+from .builtin_checker import is_builtin
+
 from ...node import Node
-from .annotator import NAMING_ANCESTOR_LABELS, get_unified_type_label
+from .annotator import NAMING_ANCESTOR_LABELS, get_unified_type_label, register_annotator
 from .annotation_utils import walk
 
 
-def _annotate_node(node: Node) -> None:
+def _annotate_node(node: Node, profile: dict[str, str]) -> None:
     """Annotate a single Java node with semantic labels.
 
     Processes one node at a time; traversal is handled externally by
@@ -42,10 +44,16 @@ def _annotate_node(node: Node) -> None:
         node.semantic_label = "root"
         return
 
-    if node.type in ("identifier", "type_identifier"):
+    # Annotate identifier that is not in import statement
+    if node.type in ("identifier", "type_identifier") and not parent.type == "scoped_identifier":
         _annotate_identifier(node)
 
     _annotate_scope_types(node)
+
+    # Edit annotation of node from standard library
+    if node.text and is_builtin(node.text, profile):
+        if node.semantic_label != "type_name":
+            node.semantic_label = "builtin_name"
 
 
 def _annotate_scope_types(node: Node) -> None:
@@ -83,6 +91,9 @@ def _annotate_identifier(node: Node) -> None:
         return
 
     if node.type == "type_identifier":
+        if parent.parent and parent.parent.type == "throw_statement":
+            node.semantic_label = "exception_name"
+            return
         node.semantic_label = "type_name"
         return
 
@@ -94,6 +105,8 @@ def _annotate_identifier(node: Node) -> None:
         return
 
     if parent.type in ("field_access", "method_invocation"):
+        if parent.parent and parent.parent.type == "throw_statement":
+            node.semantic_label = "exception_name"
         if _has_operator(parent, "."):
             if _is_right_side_of_operator(node, parent, "."):
                 node.semantic_label = (
@@ -243,7 +256,7 @@ def _is_right_side_of_operator(node: Node, parent: Node, operator: str) -> bool:
     return False
 
 
-def annotate_java(node: Node) -> Node:
+def annotate_java(node: Node, profile: dict[str, str]) -> Node:
     """Annotate a Java syntax tree with semantic labels.
 
     Main entry point for Java semantic annotation. Processes the entire tree
@@ -253,10 +266,15 @@ def annotate_java(node: Node) -> Node:
 
     Args:
         node (Node): The root of the Java syntax tree (program node).
+        profile: The language profile for builtin/type checking.
 
     Returns:
-        Node: The same tree with semantic_label attributes set throughout.
+        Node: The same tree with semantic_label and is_builtin attributes set throughout.
     """
     for n in walk(node):
-        _annotate_node(n)
+        _annotate_node(n, profile)
     return node
+
+
+# Register this annotator
+register_annotator("java", annotate_java)

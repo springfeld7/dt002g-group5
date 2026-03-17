@@ -521,6 +521,20 @@ class TestRenameIdentifierTargeting:
         with pytest.raises(ValueError, match="Unsupported rename target keyword"):
             RenameIdentifiersRule(targets=["not_a_real_target"])
 
+    def test_rename_identifier_rule_skips_builtin_identifiers(self):
+        """Identifiers labeled as 'builtin' should not be renamed."""
+        builtin_id = Node((1, 0), (1, 1), "identifier", text="len")
+        builtin_id.semantic_label = "builtin"
+        root = Node((0, 0), (0, 10), "module", children=[builtin_id])
+        root.language = "python"
+        _wire_parents(root)
+
+        rule = RenameIdentifiersRule()
+        records = rule.apply(root)
+
+        assert records == []
+        assert builtin_id.text == "len"
+
 
 class TestRenameIdentifierSuffixInference:
     """Type/suffix inference behavior for declarations."""
