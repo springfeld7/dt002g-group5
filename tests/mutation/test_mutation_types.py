@@ -39,7 +39,7 @@ def test_insert_valid_metadata():
     """
     Test that INSERT accepts valid metadata.
     """
-    metadata = {"new_val": "x = 1", "node_type": "Assign"}
+    metadata = {"new_val": "x = 1", "node_type": "Assign", "insertion_point": (0, 0)}
     assert validate_action_metadata(MutationAction.INSERT, metadata)
 
 

@@ -99,6 +99,24 @@ def make_comma_spacing_tree():
     )
 
 
+def make_negative_number_tree():
+    """Tree representing a negative number literal: -10"""
+    minus = Node((0, 0), (0, 1), "-", text="-")
+    number = Node(
+        (0, 1), (0, 3), "integer", text="10"
+    )  # could be float, decimal_floating_point, etc.
+    minus.parent = None
+    number.parent = None
+
+    root = Node((0, 0), (0, 0), "program", children=[minus, number])
+
+    # set parents
+    minus.parent = root
+    number.parent = root
+
+    return root, minus, number
+
+
 def collect_texts(root: Node):
     """Collect all node texts from a tree."""
     return [n.text for n in root.traverse() if hasattr(n, "text")]
@@ -216,9 +234,7 @@ def test_inserted_node_properties(whitespace_rule):
 
     assert inserted_node.type == "whitespace"
     assert inserted_node.text == " "
-    assert inserted_node.end_point == (-1, -1)
-    # Verify insertion point matches the comma's end_point
-    assert inserted_node.start_point == tree.children[1].end_point
+    assert inserted_node.start_point == (-1, -1)
     assert inserted_node.parent == tree
 
 
@@ -232,6 +248,31 @@ def test_mutation_records_generated(whitespace_rule):
     for rec in records:
         assert isinstance(rec, MutationRecord)
         assert rec.action in (MutationAction.REFORMAT, MutationAction.INSERT)
+
+
+def test_synthetic_whitespace_unique_negative_coordinates(whitespace_rule):
+    """Ensure synthetic whitespace nodes have unique negative start_point rows."""
+    tree = make_comma_spacing_tree()  # a tree missing space after a comma
+
+    records = whitespace_rule.apply(tree)
+
+    # Collect all synthetic nodes inserted
+    synthetic_nodes = [
+        child for child in tree.children if child.type == "whitespace" and child.start_point[0] < 0
+    ]
+
+    assert len(synthetic_nodes) > 0, "No synthetic whitespace nodes were inserted."
+
+    # All start_point row values should be unique
+    start_rows = [n.start_point[0] for n in synthetic_nodes]
+    assert len(start_rows) == len(
+        set(start_rows)
+    ), "Synthetic whitespace nodes have duplicate negative row coordinates."
+
+    # They should all be negative
+    assert all(
+        r < 0 for r in start_rows
+    ), "All synthetic whitespace nodes must have negative row coordinates."
 
 
 # ===== Edge Cases =====
@@ -304,6 +345,24 @@ def test_rounding_behavior(whitespace_rule):
 
     whitespace_rule.apply(tree)
     assert tree.children[0].text == "    "
+
+
+def test_no_space_between_minus_and_number(whitespace_rule):
+    """Negative numeric literals should not have a space inserted after the minus."""
+    root, minus, number = make_negative_number_tree()
+
+    records = whitespace_rule.apply(root)
+
+    # The minus and number nodes should remain consecutive
+    children = root.children
+    assert children[0] is minus
+    assert children[1] is number
+
+    # No INSERT mutation should target this minus node
+    assert all(
+        not (r.action == MutationAction.INSERT and r.insertion_point == minus.end_point)
+        for r in records
+    )
 
 
 def test_snap_to_grid_logic(whitespace_rule):

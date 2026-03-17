@@ -7,6 +7,8 @@ uniform code formatting.
 """
 
 from typing import List
+
+from transtructiver.prototype import node
 from .mutation_rule import MutationRule, MutationRecord
 from ..mutation_types import MutationAction
 from ...node import Node
@@ -14,6 +16,13 @@ from ...node import Node
 
 # Default number of spaces per indentation level
 DEFAULT_BASE_UNIT = 4
+NUMERIC_TYPES = (
+    "float",
+    "integer",
+    "number_literal",
+    "decimal_integer_literal",
+    "decimal_floating_point",
+)
 
 
 class WhitespaceNormalizationRule(MutationRule):
@@ -47,6 +56,13 @@ class WhitespaceNormalizationRule(MutationRule):
         """
         super().__init__()
         self.base_unit = base_unit
+        self._synthetic_row_counter = (
+            -1
+        )  # Counter for synthetic nodes to ensure unique negative coordinates
+
+    def is_numeric(self, node: Node) -> bool:
+        """Checks if a node represents a numeric literal."""
+        return any(t in node.type for t in NUMERIC_TYPES)
 
     def _is_indentation(self, node: Node) -> bool:
         """
@@ -151,21 +167,30 @@ class WhitespaceNormalizationRule(MutationRule):
         is_trigger_before = getattr(next_node, "field", None) == "operator"
         is_trigger_after = (child.type == ",") or (getattr(child, "field", None) == "operator")
 
+        # Skip inserting a space if the previous node is '-' and next node is numeric
+        if child.type == "-" and self.is_numeric(next_node):
+            return records
+
         # Insert a space if needed and not already present
         if (is_trigger_before or is_trigger_after) and next_node.type != "whitespace":
             new_ws = Node(
-                start_point=child.end_point,
-                end_point=(-1, -1),
+                start_point=(self._synthetic_row_counter, -1),
+                end_point=child.end_point,
                 type="whitespace",
                 text=" ",
             )
+            self._synthetic_row_counter -= 1  # Decrement to ensure unique negative coordinates
             new_ws.parent = root
             root.children.insert(idx + 1, new_ws)
 
             records.append(
-                self.record_insert(new_ws.start_point, new_text=" ", new_type="whitespace")
+                self.record_insert(
+                    new_ws.start_point,
+                    insertion_point=child.end_point,
+                    new_text=" ",
+                    new_type="whitespace",
+                )
             )
-
         return records
 
     def _normalize_whitespace(self, node: Node) -> List[MutationRecord]:

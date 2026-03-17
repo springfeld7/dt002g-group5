@@ -117,12 +117,13 @@ class MutationRule(ABC):
         )
 
     def record_insert(
-        self, point: tuple[int, int], new_text: str, new_type: str
+        self, point: tuple[int, int], insertion_point: tuple[int, int], new_text: str, new_type: str
     ) -> "MutationRecord":
         """Insert *node* into *parent* and return an INSERT record.
 
         Args:
             point: The insert point of the node.
+            insertion_point: The point where the node will be inserted in relation to the original
             new_text: The text of the inserted node.
             new_type: The type of the inserted node.
 
@@ -132,7 +133,11 @@ class MutationRule(ABC):
         return MutationRecord(
             node_id=point,
             action=MutationAction.INSERT,
-            metadata={"new_val": new_text, "node_type": new_type},
+            metadata={
+                "new_val": new_text,
+                "node_type": new_type,
+                "insertion_point": insertion_point,
+            },
         )
 
     def record_delete(self, parent: Node, node: Node) -> "MutationRecord":

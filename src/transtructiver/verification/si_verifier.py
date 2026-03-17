@@ -151,7 +151,7 @@ class SIVerifier:
             m_child = mut_children[m_idx]
 
             # Handle INSERTED Nodes (Lookahead in Mutated Tree)
-            if m_child.end_point[0] < 0:  # Synthetic nodes have negative row numbers
+            if m_child.start_point[0] < 0:  # Synthetic nodes have negative row numbers
                 if not self._apply_node_strategy(None, m_child, manifest):
                     return False
                 m_idx += 1

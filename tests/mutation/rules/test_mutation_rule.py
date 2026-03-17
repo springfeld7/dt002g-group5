@@ -57,15 +57,24 @@ def test_synthetic_node_record():
                 MutationRecord(
                     node_id=(-1, -1),
                     action=MutationAction.INSERT,
-                    metadata={"new_val": "pass", "node_type": "stmt"},
+                    metadata={
+                        "new_val": "pass",
+                        "node_type": "stmt",
+                        "insertion_point": (0, 0),  # required by verifier
+                    },
                 )
             ]
 
     rule = InsertDeadCodeRule()
     results = rule.apply(None)  # type: ignore[abstract]
 
+    # Check synthetic coordinates
     assert results[0].node_id[0] < 0
+    # Check action
     assert results[0].action == MutationAction.INSERT
+    # Check insertion_point exists
+    assert "insertion_point" in results[0].metadata
+    assert results[0].metadata["insertion_point"] == (0, 0)
 
 
 def test_invalid_metadata_raises_error():
