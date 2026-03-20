@@ -9,6 +9,12 @@ Outputs written per run (inside ``--output-dir``):
     * ``summary_log.csv``      — semantics-preservation pass/fail log
 """
 
+# Python version precheck
+import sys
+
+if sys.version_info < (3, 14):
+    sys.exit("Error: Python 3.14 or higher is required. Please upgrade your interpreter.")
+
 import argparse
 import importlib
 import inspect

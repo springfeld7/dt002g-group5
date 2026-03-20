@@ -9,16 +9,16 @@ import pytest
 from tree_sitter import Parser as TSParser
 from tree_sitter_language_pack import get_language
 
-from src.transtructiver.node import Node
-from src.transtructiver.parsing.adapter import convert_node
+from transtructiver.node import Node
+from transtructiver.parsing.adapter import convert_node
 
-from src.transtructiver.parsing.annotation import (
+from transtructiver.parsing.annotation import (
     annotate,
     annotate_python,
     annotate_java,
     annotate_cpp,
 )
-from src.transtructiver.parsing.annotation.builtin_checker import make_profile_from_files
+from transtructiver.parsing.annotation.builtin_checker import make_profile_from_files
 import os
 
 
