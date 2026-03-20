@@ -43,13 +43,32 @@ Transtructiver is a modular framework for code mutation, semantic annotation, an
 Run the CLI:
 
 - **With uv:**
-	```sh
-	uv run cli [options]
-	```
+    ```sh
+    # Run the CLI with options
+    uv run cli [options]
+
+    # See the CLI help
+    uv run cli --help
+
+    # Example with a config file
+    uv run cli <path-to-dataset> --config transtructiver.config.yaml
+    ```
+
 - **With pip/venv:**
-	```sh
-	python -m src.transtructiver.cli [options]
-	```
+    ```sh
+    # Run the CLI with options
+    python -m src.transtructiver.cli [options]
+
+    # See the CLI help
+    python -m src.transtructiver.cli --help
+
+    # Example with a config file
+    python -m src.transtructiver.cli <path-to-dataset> --config transtructiver.config.yaml
+    ```
+
+**Config file:**  
+`transtructiver.config.yaml` can be used to configure which mutation rules to apply and other behavior. Include it in your command with the `--config` option as shown above.
+
 
 ## Testing
 
