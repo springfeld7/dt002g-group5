@@ -37,7 +37,9 @@ languages within transformation pipelines.
 
 import random
 from abc import ABC, abstractmethod
-from typing import ClassVar, List, Any
+from tempfile import template
+from typing import ClassVar, List, Any, Optional
+from unittest import case
 
 # Configuration for DeadCodeLexicon
 # These values define the range and characteristics of the random values generated for dead code lexicon
@@ -58,8 +60,9 @@ class DeadCodeLexicon(ABC):
     and unreachable control flow.
 
     Attributes:
-        rng (random.Random): The seeded random instance used for all selections.
-        indent_unit (str): The horizontal whitespace standard (e.g., '    ' or '  ').
+        _rng (random.Random): The seeded random instance used for all selections.
+        _indent_unit (str): The horizontal whitespace standard (e.g., '    ' or '  ').
+        _current_type (Optional[str]): Tracks the type of the current variable for type-safe modifications.
         OPAQUE_PREDICATES (ClassVar[List[str]]): List of boolean expressions that always evaluate to False.
         UNREACHABLE_LOOP_HEADERS (ClassVar[List[str]]): List of loop headers that never execute their body.
         FAKE_USE_PATTERNS (ClassVar[List[str]]): List of template statements for benign variable use.
@@ -80,8 +83,9 @@ class DeadCodeLexicon(ABC):
         Args:
             rng (random.Random): A seeded random instance from the calling Rule.
         """
-        self.rng = rng
-        self.indent_unit = "    "  # Default, updated via set_indent_unit()
+        self._rng = rng
+        self._current_type: Optional[str] = None
+        self._indent_unit = "    "  # Default, updated via set_indent_unit()
 
     def set_indent_unit(self, indent_unit: str) -> None:
         """
@@ -91,7 +95,7 @@ class DeadCodeLexicon(ABC):
         Args:
             indent_unit (str): The detected or normalized indentation string.
         """
-        self.indent_unit = indent_unit
+        self._indent_unit = indent_unit
 
     # --- Universal Raw Data Generators ---
 
@@ -102,7 +106,7 @@ class DeadCodeLexicon(ABC):
         Returns:
             int: A raw integer value.
         """
-        return self.rng.randint(INT_MIN, INT_MAX)
+        return self._rng.randint(INT_MIN, INT_MAX)
 
     def _get_raw_float(self) -> float:
         """
@@ -111,7 +115,7 @@ class DeadCodeLexicon(ABC):
         Returns:
             float: A raw float value.
         """
-        return round(self.rng.uniform(FLOAT_MIN, FLOAT_MAX), FLOAT_PRECISION)
+        return round(self._rng.uniform(FLOAT_MIN, FLOAT_MAX), FLOAT_PRECISION)
 
     def _get_raw_string(self) -> str:
         """
@@ -121,23 +125,26 @@ class DeadCodeLexicon(ABC):
             str: A raw string of characters.
         """
         chars = "abcdefghijklmnopqrstuvwxyz0123456789"
-        return "".join(self.rng.choices(chars, k=STR_LENGTH))
+        return "".join(self._rng.choices(chars, k=STR_LENGTH))
 
     # --- Core Generation Logic ---
 
-    def get_random_dead_code(self, var_name: str, prefix: str) -> str:
+    def get_random_dead_code(self, var_name: str, loop_var: str, prefix: str) -> str:
         """
-        Generates a block of dead code, which may be an assignment, an unreachable if-block,
-        or an unreachable loop.
+        Generates a block of dead code, which may be:
+        - A simple assignment transaction,
+        - An unreachable if-block, or
+        - An unreachable loop block with a specified loop variable.
 
         Args:
             var_name (str): Unique identifier for the dead variable.
-            prefix (str): Current line indentation.
+            loop_var (str): Name to use for loop headers in unreachable loops.
+            prefix (str): The indentation to use for the generated code.
 
         Returns:
             str: A fully formatted block of dead code ending in a newline.
         """
-        strategy = self.rng.choice(["assignment", "if_wrap", "loop_wrap"])
+        strategy = self._rng.choice(["assignment", "if_wrap", "loop_wrap"])
         value = self.generate_random_value()
 
         match strategy:
@@ -145,18 +152,21 @@ class DeadCodeLexicon(ABC):
                 content = self._build_transaction(var_name, value, prefix)
 
             case "if_wrap":
-                body = self._build_transaction(var_name, value, prefix + self.indent_unit)
-                header = self.rng.choice(self._get_opaque_predicates())
+                body = self._build_transaction(var_name, value, prefix + self._indent_unit)
+                header = self._rng.choice(self._get_opaque_predicates())
                 content = self.format_block(header, body, prefix, is_if=True)
 
             case "loop_wrap":
-                body = self._build_transaction(var_name, value, prefix + self.indent_unit)
-                header = self.rng.choice(self._get_unreachable_loop_headers())
+                body = self._build_transaction(var_name, value, prefix + self._indent_unit)
+                raw_header = self._rng.choice(self._get_unreachable_loop_headers())
+                header = raw_header.replace("_", loop_var)
                 content = self.format_block(header, body, prefix, is_if=False)
 
             case _:
+                # Fallback: treat unknown strategy as a simple assignment
                 content = self._build_transaction(var_name, value, prefix)
 
+        # Ensure a single trailing newline
         return content if content.endswith("\n") else content + "\n"
 
     def _build_transaction(self, var_name: str, value: Any, indent: str) -> str:
@@ -180,17 +190,58 @@ class DeadCodeLexicon(ABC):
 
         return "\n".join(f"{indent}{s}" for s in statements)
 
-    # --- Language-Specific Contracts ---
-
-    @abstractmethod
-    def generate_random_value(self) -> Any:
+    def _get_meaningless_modification(self, var_name: str) -> str:
         """
-        Generates a random value of a type supported by the target language.
+        Generates an operation that references the variable without changing its state.
+
+        Args:
+            var_name (str): The name of the variable to be modified.
 
         Returns:
-            Any: A value valid for an assignment in the concrete language.
+            str: An identity operation.
         """
-        pass
+        if self._current_type == "str":
+            template = self._rng.choice(self.IDENTITY_OPS_STR)
+        else:
+            template = self._rng.choice(self.IDENTITY_OPS_NUMERIC)
+
+        return template.replace("{var}", var_name)
+
+    def _get_fake_use(self, var_name: str) -> str:
+        """
+        Generates a benign statement that references the variable to satisfy
+        static analysis tools or avoid "unused variable" warnings.
+
+
+        Args:
+            var_name (str): The variable name to be referenced in the statement.
+
+        Returns:
+            str: A single-line statement that consumes the variable without
+                affecting program semantics.
+        """
+        template = self._rng.choice(self.FAKE_USE_PATTERNS)
+        return template.replace("{var}", var_name)
+
+    def _get_opaque_predicates(self) -> List[str]:
+        """
+        Provides boolean expressions that always evaluate to False.
+
+        Returns:
+            List[str]: A list of language-specific impossible conditions.
+        """
+        return self.OPAQUE_PREDICATES
+
+    def _get_unreachable_loop_headers(self) -> List[str]:
+        """
+        Provides loop headers that will never execute their body.
+
+        Returns:
+            List[str]: A list of loop headers.
+        """
+        return self.UNREACHABLE_LOOP_HEADERS
+
+    # --- Language-Specific Contracts ---
 
     @abstractmethod
     def get_assignment_statement(self, var_name: str, value: Any) -> str:
@@ -203,32 +254,6 @@ class DeadCodeLexicon(ABC):
 
         Returns:
             str: A language-compliant assignment statement.
-        """
-        pass
-
-    @abstractmethod
-    def _get_meaningless_modification(self, var_name: str) -> str:
-        """
-        Generates an operation that references the variable without changing its state.
-
-        Args:
-            var_name (str): The name of the variable to be modified.
-
-        Returns:
-            str: An identity operation.
-        """
-        pass
-
-    @abstractmethod
-    def _get_fake_use(self, var_name: str) -> str:
-        """
-        Creates a statement that references the variable to satisfy analysis tools.
-
-        Args:
-            var_name (str): The variable name to be referenced.
-
-        Returns:
-            str: A statement that consumes the variable.
         """
         pass
 
@@ -249,21 +274,11 @@ class DeadCodeLexicon(ABC):
         pass
 
     @abstractmethod
-    def _get_opaque_predicates(self) -> List[str]:
+    def generate_random_value(self) -> Any:
         """
-        Provides boolean expressions that always evaluate to False.
+        Generates a random value of a type supported by the target language.
 
         Returns:
-            List[str]: A list of language-specific impossible conditions.
-        """
-        pass
-
-    @abstractmethod
-    def _get_unreachable_loop_headers(self) -> List[str]:
-        """
-        Provides loop headers that will never execute their body.
-
-        Returns:
-            List[str]: A list of loop headers.
+            Any: A value valid for an assignment in the concrete language.
         """
         pass
