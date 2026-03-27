@@ -11,9 +11,11 @@ Testing is performed using a TempLexicon to validate the interface contract
 independently of any specific programming language syntax.
 """
 
+from tempfile import template
+
 import pytest
 import random
-from typing import List, Any
+from typing import Any
 from src.transtructiver.mutation.rules.dead_code_insertion.lexicons.dead_code_lexicon import (
     DeadCodeLexicon,
     INT_MIN,
@@ -34,17 +36,19 @@ class MinimalLexicon(DeadCodeLexicon):
     # --- Populate required class-level lists ---
     OPAQUE_PREDICATES = ["NEVER"]
     UNREACHABLE_LOOP_HEADERS = ["LOOP({var})ZERO"]
-    FAKE_USE_PATTERNS = ["use({var})"]
     IDENTITY_OPS_STR = ["{var} = {var} + ''"]
     IDENTITY_OPS_NUMERIC = ["{var} += 0"]
 
     def generate_random_value(self) -> Any:
+        """Return a constant placeholder value for deterministic base-class testing."""
         return "temp_val"
 
     def get_assignment_statement(self, var_name: str, value: Any) -> str:
+        """Produce a minimal assignment syntax to validate base-class composition logic."""
         return f"{var_name} := {value}"
 
     def format_block(self, header: str, body: str, prefix: str, is_if: bool) -> str:
+        """Wrap content in a simple synthetic block structure to test formatting behavior."""
         return f"{prefix}BEGIN {header}\n{body}\n{prefix}END"
 
 
@@ -103,7 +107,6 @@ def test_build_transaction_logic(lexicon):
     # Instead of exact string, check for variable replacement in identity op
     assert lines[0] == f"{prefix}v1 := 100"
     assert "v1" in lines[1]  # second line is an identity op
-    assert lines[2] == f"{prefix}use(v1)"
 
 
 # ===== Strategy Dispatch and Formatting =====
@@ -114,8 +117,8 @@ def test_get_random_dead_code_assignment(lexicon, monkeypatch):
     monkeypatch.setattr(lexicon._rng, "choice", lambda x: "assignment")
 
     output = lexicon.get_random_dead_code("x", "i", "  ")
-    # Should be 3 lines of code plus a trailing newline
-    assert len(output.strip().split("\n")) == 3
+    # Should be 2 lines of code plus a trailing newline
+    assert len(output.strip().split("\n")) == 2
     assert output.endswith("\n")
 
 
@@ -250,8 +253,8 @@ def test_strategy_fallback(monkeypatch, lexicon):
     output = lexicon.get_random_dead_code("v", "i", "")
     lines = output.strip().split("\n")
 
-    # Fallback should behave like a plain transaction (3 lines)
-    assert len(lines) == 3
+    # Fallback should behave like a plain transaction (2 lines)
+    assert len(lines) == 2
 
 
 def test_block_structure_integrity(lexicon, monkeypatch):
@@ -274,17 +277,18 @@ def test_block_structure_integrity(lexicon, monkeypatch):
 
 
 def test_subclass_populates_classvars():
-    """Ensure the subclass defines all required class-level lists."""
+    """Ensure the subclass defines all required class-level lists or dicts."""
     lex = MinimalLexicon(random.Random(1))
+
+    # List-based classvars
     for attr in [
         "OPAQUE_PREDICATES",
         "UNREACHABLE_LOOP_HEADERS",
-        "FAKE_USE_PATTERNS",
         "IDENTITY_OPS_STR",
         "IDENTITY_OPS_NUMERIC",
     ]:
         val = getattr(lex.__class__, attr, None)
-        assert isinstance(val, list) and len(val) > 0, f"{attr} must be populated"
+        assert isinstance(val, list) and len(val) > 0, f"{attr} must be a non-empty list"
 
 
 def test_meaningless_modification_numeric(lexicon):
@@ -296,17 +300,9 @@ def test_meaningless_modification_numeric(lexicon):
 
 def test_meaningless_modification_string(lexicon):
     """Verify that string identity ops are applied when _current_type='str'."""
-    lexicon._current_type = "str"
+    lexicon._current_type = "string"
     result = lexicon._get_meaningless_modification("s")
     assert result in [s.replace("{var}", "s") for s in lexicon.IDENTITY_OPS_STR]
-
-
-def test_fake_use_applies_template(lexicon):
-    """Verify that _get_fake_use correctly replaces {var} in template."""
-    result = lexicon._get_fake_use("y")
-    assert "y" in result
-    # Also ensure the template was actually applied, not returned raw
-    assert result not in lexicon.FAKE_USE_PATTERNS
 
 
 def test_empty_var_name_transaction(lexicon):
@@ -314,5 +310,5 @@ def test_empty_var_name_transaction(lexicon):
     prefix = "  "
     result = lexicon._build_transaction("", "42", prefix)
     lines = result.split("\n")
-    assert len(lines) == 3
+    assert len(lines) == 2
     assert all("" in line for line in lines)  # lines contain empty string var_name

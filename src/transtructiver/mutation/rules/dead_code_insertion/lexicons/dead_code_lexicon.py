@@ -63,14 +63,12 @@ class DeadCodeLexicon(ABC):
         _current_type (Optional[str]): Tracks the type of the current variable for type-safe modifications.
         OPAQUE_PREDICATES (ClassVar[List[str]]): List of boolean expressions that always evaluate to False.
         UNREACHABLE_LOOP_HEADERS (ClassVar[List[str]]): List of loop headers that never execute their body.
-        FAKE_USE_PATTERNS (ClassVar[List[str]]): List of template statements for benign variable use.
         IDENTITY_OPS_STR (ClassVar[List[str]]): List of string identity operations that preserve value.
         IDENTITY_OPS_NUMERIC (ClassVar[List[str]]): List of numeric identity operations that preserve value.
     """
 
     OPAQUE_PREDICATES: ClassVar[List[str]]
     UNREACHABLE_LOOP_HEADERS: ClassVar[List[str]]
-    FAKE_USE_PATTERNS: ClassVar[List[str]]
     IDENTITY_OPS_STR: ClassVar[List[str]]
     IDENTITY_OPS_NUMERIC: ClassVar[List[str]]
 
@@ -157,7 +155,7 @@ class DeadCodeLexicon(ABC):
             case "loop_wrap":
                 body = self._build_transaction(var_name, value, prefix + self._indent_unit)
                 raw_header = self._rng.choice(self._get_unreachable_loop_headers())
-                header = raw_header.replace("_", loop_var)
+                header = raw_header.replace("{var}", loop_var)
                 content = self.format_block(header, body, prefix, is_if=False)
 
             case _:
@@ -183,7 +181,6 @@ class DeadCodeLexicon(ABC):
         statements = [
             self.get_assignment_statement(var_name, value),
             self._get_meaningless_modification(var_name),
-            self._get_fake_use(var_name),
         ]
 
         return "\n".join(f"{indent}{s}" for s in statements)
@@ -198,27 +195,11 @@ class DeadCodeLexicon(ABC):
         Returns:
             str: An identity operation.
         """
-        if self._current_type == "str":
+        if self._current_type == "string":
             template = self._rng.choice(self.IDENTITY_OPS_STR)
         else:
             template = self._rng.choice(self.IDENTITY_OPS_NUMERIC)
 
-        return template.replace("{var}", var_name)
-
-    def _get_fake_use(self, var_name: str) -> str:
-        """
-        Generates a benign statement that references the variable to satisfy
-        static analysis tools or avoid "unused variable" warnings.
-
-
-        Args:
-            var_name (str): The variable name to be referenced in the statement.
-
-        Returns:
-            str: A single-line statement that consumes the variable without
-                affecting program semantics.
-        """
-        template = self._rng.choice(self.FAKE_USE_PATTERNS)
         return template.replace("{var}", var_name)
 
     def _get_opaque_predicates(self) -> List[str]:
@@ -238,6 +219,29 @@ class DeadCodeLexicon(ABC):
             List[str]: A list of loop headers.
         """
         return self.UNREACHABLE_LOOP_HEADERS
+
+    def generate_random_value(self) -> Any:
+        """
+        Generates a random Python value (int, float, or str) using config-driven
+        helpers and updates the internal type tracker.
+
+        Returns:
+            Any: A raw Python value to be used in the current transaction.
+
+        Raises:
+            RuntimeError: If an unsupported type is generated.
+        """
+        self._current_type = self._rng.choice(["int", "float", "string"])
+
+        match self._current_type:
+            case "int":
+                return self._get_raw_int()
+            case "float":
+                return self._get_raw_float()
+            case "string":
+                return self._get_raw_string()
+
+        raise RuntimeError("Unsupported type generated")
 
     # --- Language-Specific Contracts ---
 
@@ -268,15 +272,5 @@ class DeadCodeLexicon(ABC):
 
         Returns:
             str: The fully constructed code block.
-        """
-        pass
-
-    @abstractmethod
-    def generate_random_value(self) -> Any:
-        """
-        Generates a random value of a type supported by the target language.
-
-        Returns:
-            Any: A value valid for an assignment in the concrete language.
         """
         pass

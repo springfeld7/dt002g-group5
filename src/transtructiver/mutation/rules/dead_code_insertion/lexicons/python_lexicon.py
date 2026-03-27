@@ -43,14 +43,6 @@ class PythonLexicon(DeadCodeLexicon):
         "for {var} in {}.values()",
     ]
 
-    FAKE_USE_PATTERNS = [
-        "_ = {var}",
-        "id({var})",
-        "type({var})",
-        "repr({var})",
-        "hash({var})",
-    ]
-
     IDENTITY_OPS_STR = [
         "{var} = {var} + ''",
         "{var} = str({var})",
@@ -71,29 +63,6 @@ class PythonLexicon(DeadCodeLexicon):
             rng (random.Random): A seeded random instance for deterministic generation.
         """
         super().__init__(rng)
-
-    def generate_random_value(self) -> Any:
-        """
-        Generates a random Python value (int, float, or str) using config-driven
-        helpers and updates the internal type tracker.
-
-        Returns:
-            Any: A raw Python value to be used in the current transaction.
-
-        Raises:
-            RuntimeError: If an unsupported type is generated.
-        """
-        self._current_type = self._rng.choice(["int", "float", "str"])
-
-        match self._current_type:
-            case "int":
-                return self._get_raw_int()
-            case "float":
-                return self._get_raw_float()
-            case "str":
-                return self._get_raw_string()
-
-        raise RuntimeError("Unsupported type generated")
 
     def get_assignment_statement(self, var_name: str, value: Any) -> str:
         """
