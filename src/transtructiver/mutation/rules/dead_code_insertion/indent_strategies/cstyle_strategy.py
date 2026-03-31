@@ -15,8 +15,9 @@ class CStyleIndent(IndentStrategy):
 
     def get_prefix(self, node) -> str | None:
         """
-        Iterates through children to find a 'whitespace' node.
-        If none exists (e.g., minified code), falls back to parent + 4.
+        Iterates through children to find a newline node to guarantee there is
+        vertical structure, then looks for the first 'whitespace' node
+        and extracts the text as the indentation prefix.
 
         Args:
             node (Node): The 'block_scope' node being analyzed.
@@ -25,6 +26,11 @@ class CStyleIndent(IndentStrategy):
             str | None: The whitespace string to be used as a prefix for inserted code,
                         or None if no suitable prefix can be determined.
         """
+
+        has_newline = any(child.type == "newline" for child in node.children)
+        if not has_newline:
+            return None
+
         for child in node.children:
             if child.type == "whitespace":
                 return child.text
