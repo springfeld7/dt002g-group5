@@ -27,6 +27,8 @@ class CStyleIndent(IndentStrategy):
                         or None if no suitable prefix can be determined.
         """
 
+        # Check if any of the children is a newline, which indicates that the block isn't a single-line block.
+        # This might mean there is an empty block like { }, in which case it's safer to return None to avoid incorrect insertion.
         has_newline = any(child.type == "newline" for child in node.children)
         if not has_newline:
             return None
