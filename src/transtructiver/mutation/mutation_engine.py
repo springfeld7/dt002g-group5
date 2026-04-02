@@ -8,6 +8,7 @@ a verifiable history of how each node in the tree was modified.
 from typing import List
 from .rules.mutation_rule import MutationRecord, MutationRule
 from .mutation_manifest import MutationManifest
+from .mutation_context import MutationContext
 from ..node import Node
 
 
@@ -49,8 +50,14 @@ class MutationEngine:
             MutationManifest: The complete transformation Manifest.
         """
         manifest = MutationManifest()
+        context = MutationContext()
+
+        # Ensure that WhitespaceNormalizationRule runs first
+        # to ensure DeadCodeInsertionRule relies upon consistent indentation
+        self.rules.sort(key=lambda r: 0 if r.rule_name == "whitespace-normalization" else 1)
+
         for rule in self.rules:
-            local_changes = rule.apply(cst)
+            local_changes = rule.apply(cst, context)
             self._merge_to_manifest(manifest, local_changes, rule.name)
 
         self.manifest = manifest

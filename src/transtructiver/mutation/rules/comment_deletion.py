@@ -9,6 +9,8 @@ for comment removal, supporting downstream verification and manifest generation.
 """
 
 from typing import List
+
+from transtructiver.mutation.mutation_context import MutationContext
 from .mutation_rule import MutationRule, MutationRecord
 from ...node import Node
 
@@ -23,7 +25,7 @@ class CommentDeletionRule(MutationRule):
     # CLI rule name (used by the auto-discovery in cli.py).
     rule_name = "comment-deletion"
 
-    def apply(self, root: Node) -> List[MutationRecord]:
+    def apply(self, root: Node, context: MutationContext) -> List[MutationRecord]:
         """
         Apply the CommentDeletion mutation rule to the CST.
 
@@ -33,6 +35,8 @@ class CommentDeletionRule(MutationRule):
 
         Args:
             root (Node): The root node of the CST to mutate.
+            context (MutationContext): The context object for tracking mutation state,
+                                       not used in this rule but included for interface consistency.
 
         Returns:
             List[MutationRecord]: A list of all deletions performed,
@@ -46,6 +50,6 @@ class CommentDeletionRule(MutationRule):
                 records.append(record)
             else:
                 # Recursively process child nodes
-                records.extend(self.apply(child))
+                records.extend(self.apply(child, context))
 
         return records

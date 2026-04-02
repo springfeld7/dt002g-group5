@@ -1,0 +1,314 @@
+"""Unit tests for the DeadCodeLexicon abstract base class.
+
+This module verifies:
+- The abstract nature of the DeadCodeLexicon (cannot be instantiated).
+- Correct behavior of universal raw data generators (int, float, string).
+- Logic for building multi-line transactions with consistent indentation.
+- Strategy dispatch (assignment vs block wrapping) and string formatting.
+- Integration with random seeding for deterministic output.
+
+Testing is performed using a TempLexicon to validate the interface contract
+independently of any specific programming language syntax.
+"""
+
+from tempfile import template
+
+import pytest
+import random
+from typing import Any
+from src.transtructiver.mutation.rules.dead_code_insertion.lexicons.dead_code_lexicon import (
+    DeadCodeLexicon,
+    INT_MIN,
+    INT_MAX,
+    FLOAT_MIN,
+    FLOAT_MAX,
+    FLOAT_PRECISION,
+    STR_LENGTH,
+)
+
+
+# ===== Setup =====
+
+
+class MinimalLexicon(DeadCodeLexicon):
+    """Minimal concrete implementation to test base class logic."""
+
+    # --- Populate required class-level lists ---
+    OPAQUE_PREDICATES = ["NEVER"]
+    UNREACHABLE_LOOP_HEADERS = ["LOOP({var})ZERO"]
+    IDENTITY_OPS_STR = ["{var} = {var} + ''"]
+    IDENTITY_OPS_NUMERIC = ["{var} += 0"]
+
+    def generate_random_value(self) -> Any:
+        """Return a constant placeholder value for deterministic base-class testing."""
+        return "temp_val"
+
+    def get_assignment_statement(self, var_name: str, value: Any) -> str:
+        """Produce a minimal assignment syntax to validate base-class composition logic."""
+        return f"{var_name} := {value}"
+
+    def format_block(self, header: str, body: str, prefix: str, is_if: bool) -> str:
+        """Wrap content in a simple synthetic block structure to test formatting behavior."""
+        return f"{prefix}BEGIN {header}\n{body}\n{prefix}END"
+
+
+@pytest.fixture
+def lexicon():
+    """Provides a MinimalLexicon instance with a fixed seed for deterministic tests."""
+    rng = random.Random(42)
+    return MinimalLexicon(rng)
+
+
+# ===== ABC Enforcement =====
+
+
+def test_cannot_instantiate_abc():
+    """Ensure that the DeadCodeLexicon ABC cannot be instantiated directly."""
+    with pytest.raises(TypeError):
+        DeadCodeLexicon(random.Random())  # type: ignore[abstract]
+
+
+# ===== Universal Raw Data Generators =====
+
+
+def test_raw_int_generation_bounds(lexicon):
+    """Verify that integer generation stays within the configured range."""
+    results = [lexicon._get_raw_int() for _ in range(50)]
+    assert all(INT_MIN <= x <= INT_MAX for x in results)
+    assert any(x != results[0] for x in results), "Should show randomness"
+
+
+def test_raw_float_generation_precision(lexicon):
+    """Verify float generation respects range and decimal precision."""
+    val = lexicon._get_raw_float()
+    assert FLOAT_MIN <= val <= FLOAT_MAX
+    # Check that it doesn't exceed configured precision
+    decimal_part = str(val).split(".")[-1]
+    assert len(decimal_part) <= FLOAT_PRECISION
+
+
+def test_raw_string_generation_length(lexicon):
+    """Verify alphanumeric strings match the configured length."""
+    val = lexicon._get_raw_string()
+    assert len(val) == STR_LENGTH
+    assert val.isalnum()
+
+
+# ===== Transaction Building =====
+
+
+def test_build_transaction_logic(lexicon):
+    """Verify that a transaction combines assignment, modification, and use with prefix."""
+    prefix = "  "
+    var = "v1"
+    result = lexicon._build_transaction(var, "100", prefix)
+    lines = result.split("\n")
+
+    # Instead of exact string, check for variable replacement in identity op
+    assert lines[0] == f"{prefix}v1 := 100"
+    assert "v1" in lines[1]  # second line is an identity op
+
+
+# ===== Strategy Dispatch and Formatting =====
+
+
+def test_get_random_dead_code_assignment(lexicon, monkeypatch):
+    """Verify output when the 'assignment' strategy is selected."""
+    monkeypatch.setattr(lexicon._rng, "choice", lambda x: "assignment")
+
+    output = lexicon.get_random_dead_code("x", "i", "  ")
+    # Should be 2 lines of code plus a trailing newline
+    assert len(output.strip().split("\n")) == 2
+    assert output.endswith("\n")
+
+
+def test_get_random_dead_code_if_wrap(lexicon, monkeypatch):
+    """Verify block wrapping logic (if_wrap) using the MinimalLexicon's format."""
+    # Force the strategy to 'if_wrap' and the header choice to 'NEVER'
+    monkeypatch.setattr(lexicon._rng, "choice", lambda x: "if_wrap" if "if_wrap" in x else x[0])
+
+    lexicon.set_indent_unit("TAB")
+    output = lexicon.get_random_dead_code("v", "i", "PRE")
+
+    lines = output.strip().split("\n")
+    assert lines[0] == "PREBEGIN NEVER"
+    assert "PRETABv := temp_val" in lines[1]  # Body must be indented
+    assert lines[-1] == "PREEND"
+
+
+def test_indent_unit_mutation(lexicon):
+    """Ensure updating the indent unit affects future block generations."""
+    lexicon.set_indent_unit("    ")
+    assert lexicon._indent_unit == "    "
+    lexicon.set_indent_unit("\t")
+    assert lexicon._indent_unit == "\t"
+
+
+def test_random_dead_code_always_ends_in_newline(lexicon):
+    """The generated string must always have exactly one trailing newline for file injection."""
+    final_output = lexicon.get_random_dead_code("v", "i", "")
+    assert final_output.count("\n") >= 1
+    assert final_output[-1] == "\n"
+    assert final_output[-2] != "\n"  # No double newlines
+
+
+def test_get_random_dead_code_loop_wrap(lexicon, monkeypatch):
+    """Verify block wrapping logic for loop_wrap strategy."""
+
+    # Force strategy selection to "loop_wrap"
+    monkeypatch.setattr(lexicon._rng, "choice", lambda x: "loop_wrap" if "loop_wrap" in x else x[0])
+
+    # Use a visible indent unit to validate propagation
+    lexicon.set_indent_unit("  ")
+    output = lexicon.get_random_dead_code("v", "i", "P")
+
+    lines = output.strip().split("\n")
+
+    # Header should reflect loop header from _get_unreachable_loop_headers()
+    assert lines[0] == "PBEGIN LOOP(i)ZERO"
+    # Body should be indented with prefix + indent_unit
+    assert lines[1].startswith("P  v := temp_val")
+    # Footer should close the block correctly
+    assert lines[-1] == "PEND"
+
+
+def test_loop_var_is_applied_to_header(lexicon, monkeypatch):
+    """Ensure that the loop_var correctly replaces '{var}' in unreachable loop headers."""
+
+    # Force loop_wrap strategy
+    monkeypatch.setattr(lexicon._rng, "choice", lambda x: "loop_wrap" if "loop_wrap" in x else x[0])
+
+    loop_var = "i"
+    output = lexicon.get_random_dead_code("v", loop_var, "")
+
+    # Extract header line
+    header_line = output.strip().split("\n")[0]
+
+    # The placeholder should be replaced
+    assert loop_var in header_line
+    assert "{var}" not in header_line  # no placeholder remaining
+    assert "LOOP(i)ZERO" in header_line
+
+
+def test_generate_random_value_is_used(monkeypatch):
+    """Ensure the value used in generated code comes from generate_random_value."""
+
+    class SpyLexicon(MinimalLexicon):
+        def generate_random_value(self):
+            # Return a unique sentinel value to detect usage
+            return "SENTINEL"
+
+    lex = SpyLexicon(random.Random(1))
+
+    # Force assignment strategy to isolate value usage
+    monkeypatch.setattr(lex._rng, "choice", lambda x: "assignment")
+
+    output = lex.get_random_dead_code("x", "i", "")
+
+    # If generate_random_value() is used correctly, SENTINEL must appear
+    assert "SENTINEL" in output
+
+
+def test_opaque_predicates_are_used(monkeypatch):
+    """Ensure opaque predicates are consulted during if_wrap."""
+
+    class SpyLexicon(MinimalLexicon):
+        def _get_opaque_predicates(self):
+            # Provide a unique predicate to verify it is used
+            return ["SPECIAL_FALSE"]
+
+    lex = SpyLexicon(random.Random(1))
+
+    # Force if_wrap strategy; subsequent choices pick first element
+    monkeypatch.setattr(lex._rng, "choice", lambda x: "if_wrap" if "if_wrap" in x else x[0])
+
+    output = lex.get_random_dead_code("v", "i", "")
+
+    # The custom predicate must appear in the generated block header
+    assert "SPECIAL_FALSE" in output
+
+
+def test_deterministic_output_with_seed():
+    """Same seed should produce identical outputs."""
+
+    seed = 123
+
+    # Two independent instances with identical seeds
+    lex1 = MinimalLexicon(random.Random(seed))
+    lex2 = MinimalLexicon(random.Random(seed))
+
+    out1 = lex1.get_random_dead_code("v", "i", "")
+    out2 = lex2.get_random_dead_code("v", "i", "")
+
+    # Determinism is critical for reproducible transformations
+    assert out1 == out2
+
+
+def test_strategy_fallback(monkeypatch, lexicon):
+    """Unknown strategy should fallback to assignment behavior."""
+
+    # Inject an invalid strategy to trigger the default match-case branch
+    monkeypatch.setattr(lexicon._rng, "choice", lambda x: "unknown_strategy")
+
+    output = lexicon.get_random_dead_code("v", "i", "")
+    lines = output.strip().split("\n")
+
+    # Fallback should behave like a plain transaction (2 lines)
+    assert len(lines) == 2
+
+
+def test_block_structure_integrity(lexicon, monkeypatch):
+    """Ensure formatted blocks strictly follow header/body/footer structure."""
+
+    # Force if_wrap strategy
+    monkeypatch.setattr(lexicon._rng, "choice", lambda x: "if_wrap" if "if_wrap" in x else x[0])
+
+    output = lexicon.get_random_dead_code("v", "i", "X")
+    lines = output.strip().split("\n")
+
+    # First line must be a properly prefixed block header
+    assert lines[0].startswith("XBEGIN")
+
+    # Last line must be the corresponding block footer
+    assert lines[-1] == "XEND"
+
+    # Ensure at least one body line exists between header and footer
+    assert len(lines) >= 3
+
+
+def test_subclass_populates_classvars():
+    """Ensure the subclass defines all required class-level lists or dicts."""
+    lex = MinimalLexicon(random.Random(1))
+
+    # List-based classvars
+    for attr in [
+        "OPAQUE_PREDICATES",
+        "UNREACHABLE_LOOP_HEADERS",
+        "IDENTITY_OPS_STR",
+        "IDENTITY_OPS_NUMERIC",
+    ]:
+        val = getattr(lex.__class__, attr, None)
+        assert isinstance(val, list) and len(val) > 0, f"{attr} must be a non-empty list"
+
+
+def test_meaningless_modification_numeric(lexicon):
+    """Verify that numeric identity ops are applied correctly."""
+    lexicon._current_type = None
+    result = lexicon._get_meaningless_modification("x")
+    assert result in [s.replace("{var}", "x") for s in lexicon.IDENTITY_OPS_NUMERIC]
+
+
+def test_meaningless_modification_string(lexicon):
+    """Verify that string identity ops are applied when _current_type='str'."""
+    lexicon._current_type = "string"
+    result = lexicon._get_meaningless_modification("s")
+    assert result in [s.replace("{var}", "s") for s in lexicon.IDENTITY_OPS_STR]
+
+
+def test_empty_var_name_transaction(lexicon):
+    """Check that _build_transaction handles empty variable names without crashing."""
+    prefix = "  "
+    result = lexicon._build_transaction("", "42", prefix)
+    lines = result.split("\n")
+    assert len(lines) == 2
+    assert all("" in line for line in lines)  # lines contain empty string var_name

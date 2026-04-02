@@ -7,6 +7,7 @@ from transtructiver.mutation.rules.identifier_renaming.rename_identifiers import
 from transtructiver.node import Node
 from transtructiver.mutation.rules.mutation_rule import MutationRecord
 from transtructiver.mutation.mutation_types import MutationAction
+from transtructiver.mutation.mutation_context import MutationContext
 
 
 # ===== Helpers =====
@@ -380,6 +381,12 @@ def assignment_type_tree() -> tuple[Node, Node, Node]:
     return make_assignment_type_tree()
 
 
+@pytest.fixture
+def mutation_context() -> MutationContext:
+    """Provide a fresh MutationContext for tests that need it."""
+    return MutationContext()
+
+
 # ===== Test Cases =====
 
 
@@ -392,18 +399,18 @@ class TestRenameIdentifierCoreBehavior:
 
         assert rule.name == "RenameIdentifiersRule"
 
-    def test_rename_identifier_rule_apply_with_none_root(self):
+    def test_rename_identifier_rule_apply_with_none_root(self, mutation_context):
         """Ensure apply handles None root safely."""
         rule = RenameIdentifiersRule()
 
-        assert rule.apply(None) == []  # type: ignore
+        assert rule.apply(None, mutation_context) == []  # type: ignore
 
-    def test_rename_identifier_rule_mutates_node_text(self, sample_tree):
+    def test_rename_identifier_rule_mutates_node_text(self, sample_tree, mutation_context):
         """Ensure apply renames identifier node text values consistently."""
         first_x, first_y, second_x, non_identifier = sample_tree.children
 
         rule = RenameIdentifiersRule()
-        rule.apply(sample_tree)
+        rule.apply(sample_tree, mutation_context)
 
         assert first_x.text != "x"
         assert first_y.text != "y"
@@ -412,12 +419,12 @@ class TestRenameIdentifierCoreBehavior:
         assert non_identifier.text == "1"
         assert second_x.text == first_x.text
 
-    def test_rename_identifier_rule_returns_mutation_records(self, sample_tree):
+    def test_rename_identifier_rule_returns_mutation_records(self, sample_tree, mutation_context):
         """Ensure apply returns correct mutation records for renamed identifiers."""
         first_x, first_y, second_x, _ = sample_tree.children
 
         rule = RenameIdentifiersRule()
-        records = rule.apply(sample_tree)
+        records = rule.apply(sample_tree, mutation_context)
 
         assert len(records) == 3
         assert all(record.action == MutationAction.RENAME for record in records)
@@ -437,11 +444,11 @@ class TestRenameIdentifierScopeBehavior:
     """Scope handling and shadowing behavior."""
 
     def test_rename_identifier_rule_uses_scope_stack_for_shadowing(
-        self, scoped_tree_with_shadowing: Node
+        self, scoped_tree_with_shadowing: Node, mutation_context
     ):
         """Inner declaration of same name should not reuse outer scope rename."""
         rule = RenameIdentifiersRule()
-        records: list[MutationRecord] = rule.apply(scoped_tree_with_shadowing)
+        records: list[MutationRecord] = rule.apply(scoped_tree_with_shadowing, mutation_context)
 
         renamed_x_nodes: list[Node] = [
             node
@@ -460,10 +467,12 @@ class TestRenameIdentifierScopeBehavior:
         # Outer x and inner x should not be equal
         assert renamed_values[(1, 0)] != renamed_values[(3, 4)]
 
-    def test_rename_identifier_rule_clears_scope_state_between_runs(self, sample_tree):
+    def test_rename_identifier_rule_clears_scope_state_between_runs(
+        self, sample_tree, mutation_context
+    ):
         """Internal scope stack should be reset after apply finishes."""
         rule = RenameIdentifiersRule()
-        rule.apply(sample_tree)
+        rule.apply(sample_tree, mutation_context)
 
         assert rule.scope == []
 
@@ -472,13 +481,13 @@ class TestRenameIdentifierTargeting:
     """Target selection and configuration validation behavior."""
 
     def test_rename_identifier_rule_skips_unannotated_identifiers(
-        self, unannotated_identifier_tree
+        self, unannotated_identifier_tree, mutation_context
     ):
         """Identifiers without semantic labels should not be renamed."""
         root, ident = unannotated_identifier_tree
 
         rule = RenameIdentifiersRule()
-        records = rule.apply(root)
+        records = rule.apply(root, mutation_context)
 
         assert records == []
         assert ident.text == "x"
@@ -488,29 +497,31 @@ class TestRenameIdentifierTargeting:
         root, function_name = module_function_tree
 
         rule = RenameIdentifiersRule()
-        records = rule.apply(root)
+        records = rule.apply(root, mutation_context)
 
         assert records == []
         assert function_name.text == "foo"
 
     def test_rename_identifier_rule_can_target_function_names_by_keyword(
-        self, module_function_tree
+        self, module_function_tree, mutation_context
     ):
         """Keyword-based targeting should allow function_name renames."""
         root, function_name = module_function_tree
 
         rule = RenameIdentifiersRule(targets=["function"])
-        records = rule.apply(root)
+        records = rule.apply(root, mutation_context)
 
         assert len(records) == 1
         assert function_name.text == "foo_fn"
 
-    def test_rename_identifier_rule_can_target_only_parameter_names(self, variable_parameter_tree):
+    def test_rename_identifier_rule_can_target_only_parameter_names(
+        self, variable_parameter_tree, mutation_context
+    ):
         """Target keywords should restrict renaming to selected semantic labels."""
         root, variable_id, parameter_id = variable_parameter_tree
 
         rule = RenameIdentifiersRule(targets=["parameter"])
-        records = rule.apply(root)
+        records = rule.apply(root, mutation_context)
 
         assert len(records) == 1
         assert variable_id.text == "x"
@@ -521,7 +532,7 @@ class TestRenameIdentifierTargeting:
         with pytest.raises(ValueError, match="Unsupported rename target keyword"):
             RenameIdentifiersRule(targets=["not_a_real_target"])
 
-    def test_rename_identifier_rule_skips_builtin_identifiers(self):
+    def test_rename_identifier_rule_skips_builtin_identifiers(self, mutation_context):
         """Identifiers labeled as 'builtin_name' should not be renamed."""
         builtin_id = Node((1, 0), (1, 1), "identifier", text="len")
         builtin_id.semantic_label = "builtin_name"
@@ -530,7 +541,7 @@ class TestRenameIdentifierTargeting:
         _wire_parents(root)
 
         rule = RenameIdentifiersRule()
-        records = rule.apply(root)
+        records = rule.apply(root, mutation_context)
 
         assert records == []
         assert builtin_id.text == "len"
@@ -539,24 +550,26 @@ class TestRenameIdentifierTargeting:
 class TestRenameIdentifierSuffixInference:
     """Type/suffix inference behavior for declarations."""
 
-    def test_rename_identifier_rule_uses_parameter_type_for_suffix(self, typed_parameter_tree):
+    def test_rename_identifier_rule_uses_parameter_type_for_suffix(
+        self, typed_parameter_tree, mutation_context
+    ):
         """Typed parameters should receive a type-aware suffix when possible."""
         root, parameter_id = typed_parameter_tree
 
         rule = RenameIdentifiersRule(targets=["parameter"])
-        records = rule.apply(root)
+        records = rule.apply(root, mutation_context)
 
         assert len(records) == 1
         assert parameter_id.text == "items_list"
 
     def test_rename_identifier_rule_uses_assignment_value_type_for_suffix(
-        self, assignment_type_tree
+        self, assignment_type_tree, mutation_context
     ):
         """Assignment declarations should infer suffixes from assigned values."""
         root, values_id, message_id = assignment_type_tree
 
         rule = RenameIdentifiersRule(targets=["variable"])
-        records = rule.apply(root)
+        records = rule.apply(root, mutation_context)
 
         assert len(records) == 2
         assert values_id.text == "valuess"
@@ -566,49 +579,53 @@ class TestRenameIdentifierSuffixInference:
 class TestRenameIdentifierFormatting:
     """Language-specific formatting and fallback behavior."""
 
-    def test_rename_identifier_rule_uses_java_style_for_program_root(self, program_function_tree):
+    def test_rename_identifier_rule_uses_java_style_for_program_root(
+        self, program_function_tree, mutation_context
+    ):
         """Program roots should use non-Python naming style formatting."""
         root, function_name = program_function_tree
 
         rule = RenameIdentifiersRule(targets=["function"])
-        records = rule.apply(root)
+        records = rule.apply(root, mutation_context)
 
         assert len(records) == 1
         assert function_name.text == "fooFn"
 
-    def test_rename_identifier_rule_formats_python_and_java_differently(self):
+    def test_rename_identifier_rule_formats_python_and_java_differently(self, mutation_context):
         """Suffix formatting should differ between module and program roots."""
         python_root, python_function = make_module_function_tree()
         java_root, java_function = make_program_function_tree()
 
         python_rule = RenameIdentifiersRule(targets=["function"])
         java_rule = RenameIdentifiersRule(targets=["function"])
-        python_rule.apply(python_root)
-        java_rule.apply(java_root)
+        python_rule.apply(python_root, mutation_context)
+        java_rule.apply(java_root, mutation_context)
 
         assert python_function.text == "foo_fn"
         assert java_function.text == "fooFn"
 
-    def test_rename_identifier_rule_empty_suffix_fallback_is_stable(self, variable_only_tree):
+    def test_rename_identifier_rule_empty_suffix_fallback_is_stable(
+        self, variable_only_tree, mutation_context
+    ):
         """When no suffix can be inferred, renaming should use fallback behavior."""
         root, variable_id = variable_only_tree
 
         rule = RenameIdentifiersRule(targets=["variable"])
-        records = rule.apply(root)
+        records = rule.apply(root, mutation_context)
 
         assert len(records) == 1
         assert variable_id.text == "dataa"
 
     def test_rename_identifier_rule_overwrites_language_each_apply_run(
-        self, program_bar_function_tree
+        self, program_bar_function_tree, mutation_context
     ):
         """Language chosen per root should not leak between consecutive apply calls."""
         python_root, python_function = make_module_function_tree()
         java_root, java_function = program_bar_function_tree
 
         rule = RenameIdentifiersRule(targets=["function"])
-        rule.apply(python_root)
-        rule.apply(java_root)
+        rule.apply(python_root, mutation_context)
+        rule.apply(java_root, mutation_context)
 
         assert python_function.text == "foo_fn"
         assert java_function.text == "barFn"

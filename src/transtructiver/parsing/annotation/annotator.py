@@ -52,7 +52,9 @@ UNIFIED_TYPE_LABELS = {
         ],
         "class_scope",
     ),
-    **dict.fromkeys(["block", "compound_statement", "class_body"], "block_scope"),
+    **dict.fromkeys(
+        ["block", "compound_statement", "class_body", "constructor_body"], "block_scope"
+    ),
     **dict.fromkeys(["for_statement", "while_statement", "for_range_loop"], "loop_scope"),
 }
 

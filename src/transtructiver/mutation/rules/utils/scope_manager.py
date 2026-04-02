@@ -1,4 +1,4 @@
-"""Scope stack manager for the identifier renaming mutation rule."""
+"""Scope stack manager for rules that require tracking of variable bindings across nested scopes."""
 
 
 class ScopeManager:
@@ -6,6 +6,10 @@ class ScopeManager:
 
     Maintains a stack of dictionaries, one per scope level.
     Lookups resolve from innermost to outermost scope.
+
+    Attributes:
+        _scopes: A list of dicts representing nested scopes, where each dict maps identifier names
+        to their associated values (e.g., original names or generated names).
     """
 
     def __init__(self) -> None:

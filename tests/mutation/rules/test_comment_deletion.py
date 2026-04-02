@@ -11,6 +11,7 @@ import pytest
 from src.transtructiver.mutation.rules.comment_deletion import CommentDeletionRule
 from src.transtructiver.mutation.rules.mutation_rule import MutationRecord
 from src.transtructiver.mutation.mutation_types import MutationAction
+from src.transtructiver.mutation.mutation_context import MutationContext
 from src.transtructiver.node import Node
 
 
@@ -115,19 +116,25 @@ def no_comments_tree():
     return make_tree_without_comments()
 
 
+@pytest.fixture
+def mutation_context():
+    """Provide a MutationContext instance."""
+    return MutationContext()
+
+
 # ===== Positive Cases =====
 
 
-def test_comment_nodes_removed(sample_tree, comment_rule):
+def test_comment_nodes_removed(sample_tree, comment_rule, mutation_context):
     """Verify that all comment nodes are removed based on semantic_label."""
-    _ = comment_rule.apply(sample_tree)
+    _ = comment_rule.apply(sample_tree, mutation_context)
 
     assert collect_comment_labels(sample_tree) == []
 
 
-def test_non_comment_nodes_preserved(sample_tree, comment_rule):
+def test_non_comment_nodes_preserved(sample_tree, comment_rule, mutation_context):
     """Verify that non-comment nodes remain intact after deletion."""
-    _ = comment_rule.apply(sample_tree)
+    _ = comment_rule.apply(sample_tree, mutation_context)
     types = collect_node_types(sample_tree)
 
     assert "program" in types
@@ -135,9 +142,9 @@ def test_non_comment_nodes_preserved(sample_tree, comment_rule):
     assert "block" in types
 
 
-def test_mutation_records_for_comments(sample_tree, comment_rule):
+def test_mutation_records_for_comments(sample_tree, comment_rule, mutation_context):
     """Verify that MutationRecords are created for each deleted comment node."""
-    records = comment_rule.apply(sample_tree)
+    records = comment_rule.apply(sample_tree, mutation_context)
 
     assert len(records) == 2
     for rec in records:
@@ -148,9 +155,9 @@ def test_mutation_records_for_comments(sample_tree, comment_rule):
         assert rec.metadata["content"].startswith("//")
 
 
-def test_nested_comments_deleted(sample_tree, comment_rule):
+def test_nested_comments_deleted(sample_tree, comment_rule, mutation_context):
     """Verify that nested comments are removed based on semantic_label."""
-    _ = comment_rule.apply(sample_tree)
+    _ = comment_rule.apply(sample_tree, mutation_context)
 
     assert all(
         getattr(n, "semantic_label", None) not in ["line_comment", "block_comment"]
@@ -158,7 +165,7 @@ def test_nested_comments_deleted(sample_tree, comment_rule):
     )
 
 
-def test_deleted_content_matches_node(sample_tree, comment_rule):
+def test_deleted_content_matches_node(sample_tree, comment_rule, mutation_context):
     """Verify that the content in MutationRecords matches the deleted comment nodes."""
     root = sample_tree
     # collect original comment texts before deletion
@@ -167,7 +174,7 @@ def test_deleted_content_matches_node(sample_tree, comment_rule):
         for n in root.traverse()
         if getattr(n, "semantic_label", None) in ["line_comment", "block_comment"]
     ]
-    records = comment_rule.apply(root)
+    records = comment_rule.apply(root, mutation_context)
     record_contents = [rec.metadata["content"] for rec in records]
 
     # All original comment texts should appear in the MutationRecords
@@ -178,9 +185,9 @@ def test_deleted_content_matches_node(sample_tree, comment_rule):
 # ===== Edge Cases =====
 
 
-def test_all_comments_deleted_only(comments_only_tree, comment_rule):
+def test_all_comments_deleted_only(comments_only_tree, comment_rule, mutation_context):
     """Verify a tree with only comments ends up empty and returns all MutationRecords."""
-    records = comment_rule.apply(comments_only_tree)
+    records = comment_rule.apply(comments_only_tree, mutation_context)
 
     assert comments_only_tree.children == []
     assert len(records) == 2
@@ -188,20 +195,22 @@ def test_all_comments_deleted_only(comments_only_tree, comment_rule):
         assert rec.metadata["node_type"] == "comment"
 
 
-def test_tree_with_no_comments_returns_empty_records(no_comments_tree, comment_rule):
+def test_tree_with_no_comments_returns_empty_records(
+    no_comments_tree, comment_rule, mutation_context
+):
     """Verify a tree without comments returns an empty list and remains unchanged."""
-    records = comment_rule.apply(no_comments_tree)
+    records = comment_rule.apply(no_comments_tree, mutation_context)
 
     assert records == []
     assert len(no_comments_tree.children) == 1
     assert no_comments_tree.children[0].type == "identifier"
 
 
-def test_empty_tree_returns_no_records(comment_rule):
+def test_empty_tree_returns_no_records(comment_rule, mutation_context):
     """Verify applying CommentDeletion to an empty tree returns empty records."""
     root = Node((0, 0), (0, 0), "program")
 
-    records = comment_rule.apply(root)
+    records = comment_rule.apply(root, mutation_context)
 
     assert records == []
     assert root.children == []

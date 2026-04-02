@@ -26,6 +26,12 @@ transformations:
     enabled: false
     params:
       base_unit: 4                          # Default: 4
+  
+  dead-code-insertion:
+    enabled: false
+    params:
+      level: 0                              # Default: 0
+      indent_unit: null                     # Default: null
 
 # Verifier thresholds and strictness
 verifier:

@@ -28,6 +28,7 @@ from .parsing.parser import Parser
 from .config import load_config, resolve_enabled_rules, get_rule_params
 from .mutation.mutation_engine import MutationEngine
 from .mutation.rules.mutation_rule import MutationRule
+from .mutation.rules.whitespace_normalization import DEFAULT_BASE_UNIT
 from .node import Node
 from .reporting import summary_logger
 from .reporting.output_manager import OutputManager, RunStats
@@ -183,6 +184,18 @@ def _build_engine(
     """
     rule_params = rule_params or {}
     configured_rules = []
+
+    # Determine shared indentation for whitespace-normalization and dead-code-insertion
+    indent_unit = None
+    if "whitespace-normalization" in rules and "dead-code-insertion" in rules:
+        # If both rules are enabled, ensure they use the same base unit for indentation.
+        ws_params = rule_params.get("whitespace-normalization", {})
+        base_unit = ws_params.get("base_unit", DEFAULT_BASE_UNIT)
+        indent_unit = " " * base_unit
+
+        rule_params.setdefault("dead-code-insertion", {})
+        rule_params["dead-code-insertion"].setdefault("indent_unit", indent_unit)
+
     for rule_name in rules:
         rule_cls = RULE_REGISTRY[rule_name]
         params = dict(rule_params.get(rule_name) or {})

@@ -8,8 +8,9 @@ uniform code formatting.
 
 from typing import List
 
+from transtructiver.mutation.mutation_context import MutationContext
+
 from .mutation_rule import MutationRule, MutationRecord
-from ..mutation_types import MutationAction
 from ...node import Node
 
 
@@ -55,9 +56,6 @@ class WhitespaceNormalizationRule(MutationRule):
         """
         super().__init__()
         self.base_unit = base_unit
-        self._synthetic_row_counter = (
-            -1
-        )  # Counter for synthetic nodes to ensure unique negative coordinates
 
     def is_numeric(self, node: Node) -> bool:
         """Checks if a node represents a numeric literal."""
@@ -144,7 +142,9 @@ class WhitespaceNormalizationRule(MutationRule):
 
         return False
 
-    def _handle_structural_spacing(self, root: Node, child: Node, idx: int) -> List[MutationRecord]:
+    def _handle_structural_spacing(
+        self, root: Node, child: Node, idx: int, context: MutationContext
+    ) -> List[MutationRecord]:
         """
         Handles missing spaces after commas and around operators by injection.
 
@@ -152,6 +152,7 @@ class WhitespaceNormalizationRule(MutationRule):
             root (Node): The parent node.
             child (Node): The current child node being inspected.
             idx (int): The current index of the child in the live children list.
+            context (MutationContext): The mutation context for tracking state across rules.
 
         Returns:
             List[MutationRecord]: Records of any injected whitespace nodes.
@@ -173,12 +174,11 @@ class WhitespaceNormalizationRule(MutationRule):
         # Insert a space if needed and not already present
         if (is_trigger_before or is_trigger_after) and next_node.type != "whitespace":
             new_ws = Node(
-                start_point=(self._synthetic_row_counter, -1),
+                start_point=(context.next_id(), -1),
                 end_point=child.end_point,
                 type="whitespace",
                 text=" ",
             )
-            self._synthetic_row_counter -= 1  # Decrement to ensure unique negative coordinates
             new_ws.parent = root
             root.children.insert(idx + 1, new_ws)
 
@@ -226,7 +226,7 @@ class WhitespaceNormalizationRule(MutationRule):
             records.append(self.record_reformat(node, new_text))
         return records
 
-    def apply(self, root: Node) -> List[MutationRecord]:
+    def apply(self, root: Node, context: MutationContext) -> List[MutationRecord]:
         """
         Applies the WhitespaceNormalizationRule to the CST.
 
@@ -236,6 +236,7 @@ class WhitespaceNormalizationRule(MutationRule):
 
         Args:
             root (Node): The root node of the CST to mutate.
+            context (MutationContext): The mutation context for tracking changes.
 
         Returns:
             List[MutationRecord]: A list of all formatting changes performed,
@@ -249,9 +250,9 @@ class WhitespaceNormalizationRule(MutationRule):
                 records.extend(self._normalize_whitespace(child))
             else:
                 # Handle structural spacing issues like missing spaces after commas or around operators
-                records.extend(self._handle_structural_spacing(root, child, idx))
+                records.extend(self._handle_structural_spacing(root, child, idx, context))
 
             # Recurse through children
-            records.extend(self.apply(child))
+            records.extend(self.apply(child, context))
 
         return records

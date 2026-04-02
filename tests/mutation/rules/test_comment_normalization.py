@@ -7,8 +7,8 @@ both flat (leaf) and nested (docstring) CST topologies.
 
 import pytest
 from src.transtructiver.mutation.rules.comment_normalization import CommentNormalizationRule
-from src.transtructiver.mutation.rules.mutation_rule import MutationRecord
 from src.transtructiver.mutation.mutation_types import MutationAction
+from src.transtructiver.mutation.mutation_context import MutationContext
 from src.transtructiver.node import Node
 
 
@@ -85,30 +85,36 @@ def nested_tree():
     return tree
 
 
+@pytest.fixture
+def mutation_context():
+    """Return a default MutationContext for testing."""
+    return MutationContext()
+
+
 # ===== Positive Cases =====
 
 
-def test_flat_comments_normalized(flat_tree, normalization_rule):
+def test_flat_comments_normalized(flat_tree, normalization_rule, mutation_context):
     """Verify flat comments are replaced with the FILLER."""
-    records = normalization_rule.apply(flat_tree)
+    records = normalization_rule.apply(flat_tree, mutation_context)
 
     assert len(records) == 2
     assert flat_tree.children[0].text == "//........"
     assert flat_tree.children[1].text == "/*........*/"
 
 
-def test_nested_docstring_normalized(nested_tree, normalization_rule):
+def test_nested_docstring_normalized(nested_tree, normalization_rule, mutation_context):
     """Verify nested string_content is replaced but delimiters are untouched."""
-    records = normalization_rule.apply(nested_tree)
+    records = normalization_rule.apply(nested_tree, mutation_context)
 
     content_node = nested_tree.children[0].children[1]
     assert content_node.text == "........"
     assert records[0].metadata["new_val"] == "........"
 
 
-def test_mutation_records_structure(flat_tree, normalization_rule):
+def test_mutation_records_structure(flat_tree, normalization_rule, mutation_context):
     """Verify records have correct action and metadata."""
-    records = normalization_rule.apply(flat_tree)
+    records = normalization_rule.apply(flat_tree, mutation_context)
 
     # Define what we expect to see across all records
     expected_values = {"//........", "/*........*/"}
@@ -126,20 +132,20 @@ def test_mutation_records_structure(flat_tree, normalization_rule):
 # ===== Edge Cases =====
 
 
-def test_no_comments_tree(normalization_rule):
+def test_no_comments_tree(normalization_rule, mutation_context):
     """Verify tree with no comments remains unchanged."""
     root = Node((0, 0), (0, 0), "program", children=[Node((1, 0), (1, 1), "identifier", text="x")])
 
-    records = normalization_rule.apply(root)
+    records = normalization_rule.apply(root, mutation_context)
 
     assert records == []
     assert root.children[0].text == "x"
 
 
-def test_empty_tree(normalization_rule):
+def test_empty_tree(normalization_rule, mutation_context):
     """Verify empty tree returns no records."""
     root = Node((0, 0), (0, 0), "program")
 
-    records = normalization_rule.apply(root)
+    records = normalization_rule.apply(root, mutation_context)
 
     assert records == []

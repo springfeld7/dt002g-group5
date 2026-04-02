@@ -11,6 +11,7 @@ from src.transtructiver.mutation.rules.whitespace_normalization import Whitespac
 from src.transtructiver.mutation.rules.mutation_rule import MutationRecord
 from src.transtructiver.mutation.mutation_types import MutationAction
 from src.transtructiver.node import Node
+from transtructiver.mutation.mutation_context import MutationContext
 
 
 # ===== Helpers =====
@@ -131,24 +132,30 @@ def whitespace_rule():
     return WhitespaceNormalizationRule()
 
 
+@pytest.fixture
+def mutation_context():
+    """Reusable MutationContext instance for tests that need to track state across rules."""
+    return MutationContext()
+
+
 # ===== Positive Cases =====
 
 
-def test_tab_indentation_expands_and_snaps(whitespace_rule):
+def test_tab_indentation_expands_and_snaps(whitespace_rule, mutation_context):
     """Tabs at indentation should expand to base_unit spaces."""
     tree = make_indentation_tree()
 
-    whitespace_rule.apply(tree)
+    whitespace_rule.apply(tree, mutation_context)
     texts = collect_texts(tree)
 
     assert " " * whitespace_rule.base_unit in texts
 
 
-def test_inline_whitespace_collapses(whitespace_rule):
+def test_inline_whitespace_collapses(whitespace_rule, mutation_context):
     """Multiple inline spaces should collapse to a single space."""
     tree = make_inline_whitespace_tree()
 
-    whitespace_rule.apply(tree)
+    whitespace_rule.apply(tree, mutation_context)
 
     texts = collect_texts(tree)
 
@@ -156,11 +163,11 @@ def test_inline_whitespace_collapses(whitespace_rule):
     assert " " in texts
 
 
-def test_padding_inside_parentheses_removed(whitespace_rule):
+def test_padding_inside_parentheses_removed(whitespace_rule, mutation_context):
     """Whitespace inside parentheses should be removed."""
     tree = make_bracket_padding_tree()
 
-    whitespace_rule.apply(tree)
+    whitespace_rule.apply(tree, mutation_context)
 
     texts = collect_texts(tree)
 
@@ -170,11 +177,11 @@ def test_padding_inside_parentheses_removed(whitespace_rule):
     assert " )" not in "".join(texts)
 
 
-def test_padding_inside_square_brackets_removed(whitespace_rule):
+def test_padding_inside_square_brackets_removed(whitespace_rule, mutation_context):
     """Whitespace inside square brackets should be removed."""
     tree = make_bracket_padding_tree()
 
-    whitespace_rule.apply(tree)
+    whitespace_rule.apply(tree, mutation_context)
 
     texts = collect_texts(tree)
 
@@ -182,11 +189,11 @@ def test_padding_inside_square_brackets_removed(whitespace_rule):
     assert " ]" not in "".join(texts)
 
 
-def test_operator_spacing_inserted(whitespace_rule):
+def test_operator_spacing_inserted(whitespace_rule, mutation_context):
     """Missing whitespace around operators should be inserted."""
     tree = make_operator_spacing_tree()
 
-    whitespace_rule.apply(tree)
+    whitespace_rule.apply(tree, mutation_context)
 
     texts = collect_texts(tree)
 
@@ -195,11 +202,11 @@ def test_operator_spacing_inserted(whitespace_rule):
     assert " " in texts
 
 
-def test_comma_spacing_inserted(whitespace_rule):
+def test_comma_spacing_inserted(whitespace_rule, mutation_context):
     """Missing whitespace after commas should be inserted."""
     tree = make_comma_spacing_tree()
 
-    whitespace_rule.apply(tree)
+    whitespace_rule.apply(tree, mutation_context)
 
     children = tree.children
 
@@ -209,25 +216,25 @@ def test_comma_spacing_inserted(whitespace_rule):
             assert children[i + 1].text == " "
 
 
-def test_idempotency_of_comma_spacing(whitespace_rule):
+def test_idempotency_of_comma_spacing(whitespace_rule, mutation_context):
     """Running the rule twice should result in zero additional mutations."""
     tree = make_comma_spacing_tree()
 
     # First pass: should perform insertion
-    records1 = whitespace_rule.apply(tree)
+    records1 = whitespace_rule.apply(tree, mutation_context)
     assert len(records1) > 0
     assert any(r.action == MutationAction.INSERT for r in records1)
 
     # Second pass: should find everything already normalized
-    records2 = whitespace_rule.apply(tree)
+    records2 = whitespace_rule.apply(tree, mutation_context)
     assert len(records2) == 0
 
 
-def test_inserted_node_properties(whitespace_rule):
+def test_inserted_node_properties(whitespace_rule, mutation_context):
     """Verify that inserted whitespace nodes have valid parent pointers and sentinel coordinates."""
     tree = make_comma_spacing_tree()
 
-    whitespace_rule.apply(tree)
+    whitespace_rule.apply(tree, mutation_context)
 
     # The comma is at index 1, so the new whitespace should be at index 2
     inserted_node = tree.children[2]
@@ -238,11 +245,11 @@ def test_inserted_node_properties(whitespace_rule):
     assert inserted_node.parent == tree
 
 
-def test_mutation_records_generated(whitespace_rule):
+def test_mutation_records_generated(whitespace_rule, mutation_context):
     """Whitespace normalization should generate MutationRecords."""
     tree = make_inline_whitespace_tree()
 
-    records = whitespace_rule.apply(tree)
+    records = whitespace_rule.apply(tree, mutation_context)
 
     assert len(records) > 0
     for rec in records:
@@ -250,11 +257,11 @@ def test_mutation_records_generated(whitespace_rule):
         assert rec.action in (MutationAction.REFORMAT, MutationAction.INSERT)
 
 
-def test_synthetic_whitespace_unique_negative_coordinates(whitespace_rule):
+def test_synthetic_whitespace_unique_negative_coordinates(whitespace_rule, mutation_context):
     """Ensure synthetic whitespace nodes have unique negative start_point rows."""
     tree = make_comma_spacing_tree()  # a tree missing space after a comma
 
-    records = whitespace_rule.apply(tree)
+    records = whitespace_rule.apply(tree, mutation_context)
 
     # Collect all synthetic nodes inserted
     synthetic_nodes = [
@@ -278,26 +285,26 @@ def test_synthetic_whitespace_unique_negative_coordinates(whitespace_rule):
 # ===== Edge Cases =====
 
 
-def test_tree_without_whitespace(whitespace_rule):
+def test_tree_without_whitespace(whitespace_rule, mutation_context):
     """Tree without whitespace should produce no mutations."""
     tree = Node((0, 0), (0, 0), "program", children=[Node((0, 0), (0, 1), "identifier", text="x")])
 
-    records = whitespace_rule.apply(tree)
+    records = whitespace_rule.apply(tree, mutation_context)
 
     assert records == []
 
 
-def test_empty_tree_returns_no_records(whitespace_rule):
+def test_empty_tree_returns_no_records(whitespace_rule, mutation_context):
     """Applying rule to an empty tree should produce no records."""
     root = Node((0, 0), (0, 0), "program")
 
-    records = whitespace_rule.apply(root)
+    records = whitespace_rule.apply(root, mutation_context)
 
     assert records == []
     assert root.children == []
 
 
-def test_mixed_reformat_and_insert(whitespace_rule):
+def test_mixed_reformat_and_insert(whitespace_rule, mutation_context):
     """Verify that a single pass handles both REFORMAT (for tabs) and INSERT (for commas)."""
     # Create a tree with a tab at the start and a missing space after a comma
     tree = Node(
@@ -316,7 +323,7 @@ def test_mixed_reformat_and_insert(whitespace_rule):
     for child in tree.children:
         child.parent = tree
 
-    records = whitespace_rule.apply(tree)
+    records = whitespace_rule.apply(tree, mutation_context)
 
     actions = [r.action for r in records]
     assert MutationAction.REFORMAT in actions
@@ -324,34 +331,34 @@ def test_mixed_reformat_and_insert(whitespace_rule):
     assert len(tree.children) == 5  # Ensure the node was actually added
 
 
-def test_handle_missing_field_gracefully(whitespace_rule):
+def test_handle_missing_field_gracefully(whitespace_rule, mutation_context):
     """Ensure rule handles nodes without 'field' attributes without crashing."""
     tree = Node(
         (0, 0), (0, 0), "program", children=[Node((0, 0), (0, 1), "type_with_no_field", text="x")]
     )
     # Should not raise AttributeError
     try:
-        whitespace_rule.apply(tree)
+        whitespace_rule.apply(tree, mutation_context)
     except AttributeError as e:
         pytest.fail(f"Whitespace rule crashed on node without 'field': {e}")
 
 
-def test_rounding_behavior(whitespace_rule):
+def test_rounding_behavior(whitespace_rule, mutation_context):
     """Ensure 2 spaces with base_unit=4 rounds to 4 (snapping up)."""
     # 2 is exactly halfway, distance_up (2) <= distance_down (2) should snap up
     whitespace_rule.base_unit = 4
     tree = Node((0, 0), (0, 0), "program", children=[Node((0, 0), (0, 1), "whitespace", text="  ")])
     tree.children[0].parent = tree
 
-    whitespace_rule.apply(tree)
+    whitespace_rule.apply(tree, mutation_context)
     assert tree.children[0].text == "    "
 
 
-def test_no_space_between_minus_and_number(whitespace_rule):
+def test_no_space_between_minus_and_number(whitespace_rule, mutation_context):
     """Negative numeric literals should not have a space inserted after the minus."""
     root, minus, number = make_negative_number_tree()
 
-    records = whitespace_rule.apply(root)
+    records = whitespace_rule.apply(root, mutation_context)
 
     # The minus and number nodes should remain consecutive
     children = root.children
@@ -383,7 +390,7 @@ def test_snap_to_grid_logic(whitespace_rule):
     assert whitespace_rule._snap_to_grid(6, base) == 8
 
 
-def test_nested_structural_spacing(whitespace_rule):
+def test_nested_structural_spacing(whitespace_rule, mutation_context):
     """Ensure rule normalizes spacing deep within a nested tree."""
     # Build: [program [if [condition , expression]]]
     tree = Node(
@@ -416,7 +423,39 @@ def test_nested_structural_spacing(whitespace_rule):
     for c in tree.children[0].children[0].children:
         c.parent = tree.children[0].children[0]
 
-    whitespace_rule.apply(tree)
+    whitespace_rule.apply(tree, mutation_context)
     # Check if a space was inserted in the deeply nested list
     assert tree.children[0].children[0].children[1].type == ","
     assert tree.children[0].children[0].children[2].type == "whitespace"
+
+
+def test_context_counter_persists_across_multiple_rule_calls(whitespace_rule, mutation_context):
+    """
+    Verify that the MutationContext counter decrements and persists
+    across multiple applications or rules.
+    """
+    tree1 = make_comma_spacing_tree()  # Will trigger 1 insertion
+    tree2 = make_comma_spacing_tree()  # Will trigger 1 insertion
+
+    # Track starting state
+    initial_id = mutation_context.synthetic_row_counter  # Should be -1
+
+    # First application
+    whitespace_rule.apply(tree1, mutation_context)
+    id_after_first = mutation_context.synthetic_row_counter
+
+    # Second application
+    whitespace_rule.apply(tree2, mutation_context)
+    id_after_second = mutation_context.synthetic_row_counter
+
+    # Assertions
+    assert id_after_first < initial_id, "Counter did not decrement after first insertion"
+    assert id_after_second < id_after_first, "Counter did not continue decrementing on second call"
+
+    # Verify the actual nodes in the trees have the expected sequential IDs
+    # Tree 1 should have ID -1, Tree 2 should have ID -2
+    node1_id = next(c.start_point[0] for c in tree1.children if c.type == "whitespace")
+    node2_id = next(c.start_point[0] for c in tree2.children if c.type == "whitespace")
+
+    assert node1_id == -1
+    assert node2_id == -2

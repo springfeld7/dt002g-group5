@@ -7,9 +7,11 @@ deterministic identifier renaming over annotated CST nodes and emits
 MutationRecord entries for each rename action.
 """
 
+from transtructiver.mutation.mutation_context import MutationContext
+
 from ....node import Node
 from ..mutation_rule import MutationRecord, MutationRule
-from ._scope_manager import ScopeManager
+from ..utils.scope_manager import ScopeManager
 from ._name_generator import NameGenerator
 
 
@@ -191,11 +193,13 @@ class RenameIdentifiersRule(MutationRule):
     # Entry point
     # ------------------------------------------------------------------
 
-    def apply(self, root: Node) -> list[MutationRecord]:
+    def apply(self, root: Node, context: MutationContext) -> list[MutationRecord]:
         """Apply identifier renaming to an annotated CST root.
 
         Args:
             root: Annotated CST root node.
+            context: MutationContext for this mutation application,
+                     unused by this rule but available for future extensions.
 
         Returns:
             A list of MutationRecord entries for performed rename actions.

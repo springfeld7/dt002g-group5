@@ -7,9 +7,11 @@ reporting mechanism for tracking changes via original source coordinates.
 
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
-from typing import Any, Dict, List, Tuple
-from ..mutation_types import MutationAction
 from dataclasses import dataclass
+from typing import Any, Dict, List, Tuple
+
+from ..mutation_context import MutationContext
+from ..mutation_types import MutationAction
 from ..mutation_types import MutationAction, validate_action_metadata
 from ...node import Node
 
@@ -53,12 +55,13 @@ class MutationRule(ABC):
         self.name = self.__class__.__name__
 
     @abstractmethod
-    def apply(self, root: Node) -> List[MutationRecord]:
+    def apply(self, root: Node, context: MutationContext) -> List[MutationRecord]:
         """
         Applies a mutation to the CST and returns a log of modifications.
 
         Args:
             root (Any): The root node of the tree to be mutated.
+            context (MutationContext, optional): Context object for sharing state across rules.
 
         Returns:
             List[MutationRecord]: Records of all modifications made.
