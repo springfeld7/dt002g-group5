@@ -1,7 +1,14 @@
-"""C-Style Indentation Strategy
+"""C-Style Insertion Strategy
 
-Handles braced languages (Java, C++, C, etc.) where children of a block scope
-are starts with a curly brace followed by a whitespace node that defines the indentation level.
+Handles code insertion for brace-delimited languages (C, C++, Java, etc.). 
+
+This strategy:
+* **Calculates Indentation**: Determines the required leading whitespace by 
+    analyzing the block's vertical structure.
+* **Validates Insertion Points**: Checks gaps between nodes to ensure 
+    insertions only occur at valid logical breaks (e.g., after newlines).
+* **Defines Terminal Conditions**: Identifies statements that end execution 
+    within a block (like returns or breaks) to manage insertion flow.
 """
 
 from typing import Optional

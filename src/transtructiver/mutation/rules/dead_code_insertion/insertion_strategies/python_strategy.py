@@ -1,6 +1,14 @@
-"""Python Indentation Strategy
+"""Python Insertion Strategy
 
-Handles insertion point validation and indentation discovery for Python's indentation-sensitive blocks.
+Handles code insertion for indentation-based blocks in Python.
+
+This strategy:
+* **Calculates Indentation**: Derives the required prefix based on the column 
+    offset of the block's start point.
+* **Validates Insertion Points**: Permits placement at the very start of a 
+    block or immediately following any newline node.
+* **Defines Terminal Conditions**: Identifies control-flow exits and the 
+    'pass' statement as boundaries to prevent redundant or dead-code insertion.
 """
 
 from typing import Optional
